@@ -1,3 +1,15 @@
+mod framework;
+
+mod gui;
+use gui::GuiProgram;
+
+mod text;
+
+#[allow(dead_code)]
 fn main() {
-    println!("Hello, world!");
+    framework::run("Test");
 }
+
+// Examples:
+// https://github.com/gfx-rs/wgpu-rs/blob/v0.5/examples/framework.rs
+// https://github.com/gfx-rs/wgpu-rs/blob/v0.5/Cargo.toml
