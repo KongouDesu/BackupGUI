@@ -39,7 +39,6 @@ pub struct GuiProgram {
     pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::BindGroup,
     transform: wgpu::Buffer,
-    current_transform: [f32;16],
     multisampled_framebuffer: wgpu::TextureView,
     rebuild_pipeline: bool,
     sample_count: u32,
@@ -213,7 +212,6 @@ impl GuiProgram {
             pipeline,
             uniforms,
             transform,
-            current_transform: [0.0; 16],
             multisampled_framebuffer,
             rebuild_pipeline: false,
             sample_count,
@@ -242,7 +240,30 @@ impl GuiProgram {
         self.sc_desc = sc_desc.clone();
         self.multisampled_framebuffer =
             GuiProgram::create_multisampled_framebuffer(device, sc_desc, self.sample_count);
-        None
+
+        /// Update the transform matrix
+        /// 1. Generate new matrix
+        let transform = ortho(0.0, sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0);
+        /// 2. Create buffer
+        let transform_buffer = device.create_buffer_with_data(
+            transform.as_bytes(),
+            wgpu::BufferUsage::COPY_SRC,
+        );
+
+        /// 3. Create encoder to copy
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Resize encoder") });
+
+        /// 4. Copy to transform buffer
+        encoder.copy_buffer_to_buffer(
+            &transform_buffer,
+            0,
+            &self.transform,
+            0,
+            16 * 4,
+        );
+
+        Some(encoder.finish())
     }
 
     pub fn update(&mut self, event: winit::event::WindowEvent) {
@@ -334,25 +355,6 @@ impl GuiProgram {
                     clear_color: wgpu::Color::BLACK,
                 }
             };
-
-            /*
-            if self.transform != self.pipeline.current_transform {
-                let transform_buffer = device.create_buffer_with_data(
-                    transform.as_bytes(),
-                    wgpu::BufferUsage::COPY_SRC,
-                );
-
-                encoder.copy_buffer_to_buffer(
-                    &transform_buffer,
-                    0,
-                    &pipeline.transform,
-                    0,
-                    16 * 4,
-                );
-
-                pipeline.current_transform = transform;
-            }
-            */
 
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[rpass_color_attachment],
