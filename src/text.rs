@@ -19,10 +19,11 @@ impl TextHandler {
     }
 
     // Queues a string to be drawn
-    pub fn draw(&mut self, x: f32, y: f32) {
+    // Scale is the size of the text in PIXELS
+    pub fn draw(&mut self, text: &str, x: f32, y: f32, scale: f32, color: [f32; 4]) {
         self.glyph_brush.queue(Section {
             screen_position: (x, y),
-            text: vec![Text::new("Test text").with_scale(400.0).with_color([1.0,1.0,1.0,1.0])],
+            text: vec![Text::new(text).with_scale(scale).with_color(color)],
             ..Section::default()
         });
     }

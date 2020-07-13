@@ -4,6 +4,8 @@ mod gui;
 use gui::GuiProgram;
 
 mod text;
+mod ui;
+mod files;
 
 #[allow(dead_code)]
 fn main() {

@@ -2,6 +2,10 @@ use crate::framework;
 use zerocopy::{AsBytes, FromBytes};
 use wgpu::vertex_attr_array;
 use crate::text;
+use crate::ui;
+use crate::files;
+use crate::ui::UIConfig;
+use std::sync::Mutex;
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes)]
@@ -21,7 +25,7 @@ pub struct GuiProgram {
     rebuild_pipeline: bool,
     sample_count: u32,
     sc_desc: wgpu::SwapChainDescriptor,
-    text_handler: text::TextHandler,
+    ui_manager: ui::UIManager,
 }
 
 impl GuiProgram {
@@ -163,7 +167,18 @@ impl GuiProgram {
             rebuild_pipeline: false,
             sample_count,
             sc_desc: sc_desc.clone(),
-            text_handler: text::TextHandler::init(&device, sc_desc.format),
+            ui_manager: ui::UIManager {
+                fileroot: files::get_roots().unwrap(),
+                config: UIConfig {
+                    tree_width: 1024.0,
+                    tree_height: 1024.0,
+                    font_size: 40.0,
+                },
+                text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
+                scroll: 0.0,
+                cx: 0.0,
+                cy: 0.0,
+            }
         };
         (this, None)
     }
@@ -199,6 +214,26 @@ impl GuiProgram {
                         _ => {}
                     }
                 }
+            },
+            winit::event::WindowEvent::MouseWheel {
+                delta: winit::event::MouseScrollDelta::LineDelta(_, y),
+                ..
+            } => {
+                self.ui_manager.scroll(y*24.0);
+            },
+            winit::event::WindowEvent::MouseInput {device_id, state, button, modifiers} => {
+                if state == winit::event::ElementState::Pressed  {
+                    let but = match button {
+                        winit::event::MouseButton::Left => 1,
+                        winit::event::MouseButton::Right => 2,
+                        winit::event::MouseButton::Middle => 3,
+                        winit::event::MouseButton::Other(n) => n,
+                    };
+                    self.ui_manager.on_click(but);
+                }
+            },
+            winit::event::WindowEvent::CursorMoved {device_id, position, modifiers} => {
+                self.ui_manager.cursor_moved(position.x as f32, position.y as f32);
             }
             _ => {}
         }
@@ -253,8 +288,10 @@ impl GuiProgram {
             rpass.draw(0 .. self.vertex_count, 0 .. 1);
         }
 
-        self.text_handler.draw(0.0, 0.0);
-        self.text_handler.flush(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
+        self.ui_manager.render_file_tree(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
+
+        //self.text_handler.draw(0.0, 0.0);
+        //self.text_handler.flush(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
 
         encoder.finish()
     }
