@@ -1,6 +1,6 @@
 use crate::framework;
 use zerocopy::{AsBytes, FromBytes};
-use wgpu::vertex_attr_array;
+use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
 use crate::text;
 use crate::ui;
 use crate::files;
@@ -8,10 +8,28 @@ use crate::ui::UIConfig;
 use std::sync::Mutex;
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes, FromBytes)]
-struct Vertex {
+#[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
+pub struct Vertex {
     _pos: [f32; 2],
     _color: [f32; 4],
+}
+
+impl Vertex {
+    pub fn new(pos: [f32; 2], color: [f32; 4]) -> Self {
+        Vertex {
+            _pos: pos,
+            _color: color,
+        }
+    }
+
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, color: [f32;4]) -> Vec<Self> {
+        vec![
+            Self::new([x,y],color),
+            Self::new([x+w,y],color),
+            Self::new([x,y+h],color),
+            Self::new([x+w,y+h],color),
+        ]
+    }
 }
 
 pub struct GuiProgram {
@@ -19,9 +37,10 @@ pub struct GuiProgram {
     fs_module: wgpu::ShaderModule,
     pipeline_layout: wgpu::PipelineLayout,
     pipeline: wgpu::RenderPipeline,
+    uniforms: wgpu::BindGroup,
+    transform: wgpu::Buffer,
+    current_transform: [f32;16],
     multisampled_framebuffer: wgpu::TextureView,
-    vertex_buffer: wgpu::Buffer,
-    vertex_count: u32,
     rebuild_pipeline: bool,
     sample_count: u32,
     sc_desc: wgpu::SwapChainDescriptor,
@@ -55,7 +74,7 @@ impl GuiProgram {
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
             }),
-            primitive_topology: wgpu::PrimitiveTopology::LineList,
+            primitive_topology: wgpu::PrimitiveTopology::TriangleStrip,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: sc_desc.format,
                 color_blend: wgpu::BlendDescriptor::REPLACE,
@@ -104,6 +123,18 @@ impl GuiProgram {
     }
 }
 
+fn ortho(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32) -> [f32; 16] {
+    let tx = -(right + left) / (right - left);
+    let ty = -(top + bottom) / (top - bottom);
+    let tz = -(far + near) / (far - near);
+    [
+        2.0 / (right - left), 0.0, 0.0, 0.0,
+        0.0, 2.0 / (top - bottom), 0.0, 0.0,
+        0.0, 0.0, -2.0 / (far - near), 0.0,
+        tx, ty, tz, 1.0,
+    ]
+}
+
 impl GuiProgram {
     pub fn init(
         sc_desc: &wgpu::SwapChainDescriptor,
@@ -111,6 +142,42 @@ impl GuiProgram {
     ) -> (Self, Option<wgpu::CommandBuffer>) {
         println!("Press left/right arrow keys to change sample_count.");
         let sample_count = 4;
+
+
+        let transform = device.create_buffer_with_data(
+            ortho(0.0,sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0).as_bytes(),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
+
+        let uniform_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("uniforms"),
+                bindings: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStage::VERTEX,
+                        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                    },
+                ],
+            });
+
+        let uniforms = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("uniforms2"),
+            layout: &uniform_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &transform,
+                        range: 0..64,
+                    },
+                },
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&uniform_layout],
+        });
 
         let vs_bytes =
             framework::load_glsl(include_str!("shader.vert"), framework::ShaderStage::Vertex);
@@ -121,9 +188,10 @@ impl GuiProgram {
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
+        /*
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[],
-        });
+        });*/
 
         let pipeline = GuiProgram::create_pipeline(
             device,
@@ -136,34 +204,17 @@ impl GuiProgram {
         let multisampled_framebuffer =
             GuiProgram::create_multisampled_framebuffer(device, sc_desc, sample_count);
 
-        let mut vertex_data = vec![];
-
-        let max = 50;
-        for i in 0 .. max {
-            let percent = i as f32 / max as f32;
-            let (sin, cos) = (percent * 2.0 * std::f32::consts::PI).sin_cos();
-            vertex_data.push(Vertex {
-                _pos: [0.0, 0.0],
-                _color: [1.0, -sin, cos, 1.0],
-            });
-            vertex_data.push(Vertex {
-                _pos: [1.0 * cos, 1.0 * sin],
-                _color: [sin, -cos, 1.0, 1.0],
-            });
-        }
-
-        let vertex_buffer =
-            device.create_buffer_with_data(vertex_data.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let vertex_count = vertex_data.len() as u32;
+        let vertex_count = 0 as u32;
 
         let this = GuiProgram {
             vs_module,
             fs_module,
             pipeline_layout,
             pipeline,
+            uniforms,
+            transform,
+            current_transform: [0.0; 16],
             multisampled_framebuffer,
-            vertex_buffer,
-            vertex_count,
             rebuild_pipeline: false,
             sample_count,
             sc_desc: sc_desc.clone(),
@@ -172,7 +223,7 @@ impl GuiProgram {
                 config: UIConfig {
                     tree_width: 1024.0,
                     tree_height: 1024.0,
-                    font_size: 40.0,
+                    font_size: 24.0,
                 },
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
@@ -243,7 +294,7 @@ impl GuiProgram {
         &mut self,
         frame: &wgpu::SwapChainOutput,
         device: &wgpu::Device,
-    ) -> wgpu::CommandBuffer {
+    ) -> Vec<wgpu::CommandBuffer> {
         if self.rebuild_pipeline {
             self.pipeline = GuiProgram::create_pipeline(
                 device,
@@ -258,9 +309,14 @@ impl GuiProgram {
             self.rebuild_pipeline = false;
         }
 
+        let vertices = self.ui_manager.render_file_tree();
+
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        {
+
+        if !vertices.is_empty() {
+            let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
+
             let rpass_color_attachment = if self.sample_count == 1 {
                 wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -279,20 +335,64 @@ impl GuiProgram {
                 }
             };
 
+            /*
+            if self.transform != self.pipeline.current_transform {
+                let transform_buffer = device.create_buffer_with_data(
+                    transform.as_bytes(),
+                    wgpu::BufferUsage::COPY_SRC,
+                );
+
+                encoder.copy_buffer_to_buffer(
+                    &transform_buffer,
+                    0,
+                    &pipeline.transform,
+                    0,
+                    16 * 4,
+                );
+
+                pipeline.current_transform = transform;
+            }
+            */
+
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[rpass_color_attachment],
                 depth_stencil_attachment: None,
             });
+
             rpass.set_pipeline(&self.pipeline);
-            rpass.set_vertex_buffer(0, &self.vertex_buffer, 0, 0);
-            rpass.draw(0 .. self.vertex_count, 0 .. 1);
+            rpass.set_bind_group(0, &self.uniforms, &[]);
+            rpass.set_vertex_buffer(0, &buffer, 0, 0);
+
+
+            rpass.draw(0..vertices.len() as u32, 0..3);
+        }
+        let cb1 = encoder.finish();
+
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Text") });
+
+        // Draw on top of previous (i.e., entry background rectangle)
+        {
+            let _ = encoder.begin_render_pass(
+                &wgpu::RenderPassDescriptor {
+                    color_attachments: &[
+                        wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.view,
+                            resolve_target: None,
+                            load_op: wgpu::LoadOp::Load,
+                            store_op: wgpu::StoreOp::Store,
+                            clear_color: wgpu::Color::BLACK,
+                        },
+                    ],
+                    depth_stencil_attachment: None,
+                },
+            );
         }
 
-        self.ui_manager.render_file_tree(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
+        self.ui_manager.text_handler.lock().unwrap().flush(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
 
-        //self.text_handler.draw(0.0, 0.0);
-        //self.text_handler.flush(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
+       let cb2 = encoder.finish();
 
-        encoder.finish()
+        vec![cb1,cb2]
     }
 }

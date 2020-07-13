@@ -12,6 +12,7 @@ use std::ffi::OsString;
 use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+use std::cmp::Ordering;
 
 pub fn print_files() {
     let x = Path::new("/../");
@@ -149,6 +150,39 @@ pub struct DirEntry {
     pub expanded: Arc<Mutex<bool>>,
 }
 
+
+/// Ordering implementation for a dir entry
+/// Directories ALWAYS sort before files
+/// Directories are sorted by name
+/// Files are left in whatever order the OS gave them, i.e. this implementation does not change it
+impl Ord for DirEntry {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (&self.kind, &other.kind) {
+            (EntryKind::Directory, EntryKind::File) => Ordering::Less,
+            (EntryKind::File, EntryKind::Directory) => Ordering::Greater,
+            (EntryKind::Directory, EntryKind::Directory) => self.name.cmp(&other.name),
+            // Don't compare files, as it takes excessive amounts of time in dirs with many files
+            (EntryKind::File, EntryKind::File) => Ordering::Equal,
+        }
+    }
+}
+
+impl PartialOrd for DirEntry {
+    fn partial_cmp(&self, other: &DirEntry) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for DirEntry {
+
+}
+
+impl PartialEq for DirEntry {
+    fn eq(&self, other: &DirEntry) -> bool {
+        self.kind == other.kind && self.name == other.name
+    }
+}
+
 impl DirEntry {
     /// Expands this entry's children
     /// This will populate the 'children' vector
@@ -156,6 +190,7 @@ impl DirEntry {
     ///
     /// Silently ignores most errors, as they're almost all permission-related
     /// Symlinks are IGNORED to prevent cycles
+    /// Sorts elements, see Ord impl for DirEntry
     pub fn expand(&self) {
         println!("{:?}", self.path);
         // Only index once, see 'refresh_children'
@@ -204,6 +239,9 @@ impl DirEntry {
                 )
             }
         }
+        // Sort the elements, see Ord impl for DirEntry for details
+        self.children.lock().unwrap().sort();
+
         *self.indexed.lock().unwrap() = true;
         *self.expanded.lock().unwrap() = true;
     }

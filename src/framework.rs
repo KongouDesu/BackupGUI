@@ -167,7 +167,7 @@ fn start(
                     .get_next_texture()
                     .expect("Timeout when acquiring next swap chain texture");
                 let command_buf = program.render(&frame, &device);
-                queue.submit(&[command_buf]);
+                queue.submit(&command_buf);
             }
             _ => {}
         }

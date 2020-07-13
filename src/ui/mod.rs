@@ -6,6 +6,7 @@
 
 use crate::files::{DirEntry, Action};
 use crate::text::TextHandler;
+use crate::gui::Vertex;
 
 use std::path::Path;
 use std::io::BufRead;
@@ -47,13 +48,18 @@ impl UIManager  {
     // Renders the file tree
     // The top-left corner is at (0,0) (in screen coordinates)
     // Translate the viewport before if it needs to be elsewhere
-    pub fn render_file_tree(&self, device: &wgpu::Device, mut encoder: &mut wgpu::CommandEncoder, frame: &wgpu::SwapChainOutput, size: (u32,u32)) {
+    // Note: text handler must be flushed manually to render the text
+    // Returns a vec of vertices representing what it wants to draw
+    pub fn render_file_tree(&self) -> Vec<Vertex> {
         let mut y = self.scroll;
         let mut indent = 0f32;
+        let mut vertices: Vec<Vertex> = Vec::new();
 
         // Render background, note that font_size determines height
         for entry in self.fileroot.children.lock().unwrap().iter() {
-            y = self.render_subtree(entry, y, indent);
+            let res = self.render_subtree(entry, y, indent, vertices);
+            y = res.0;
+            vertices = res.1;
         }
 
         // TODO Flush before drawing text
@@ -63,21 +69,22 @@ impl UIManager  {
         for entry in self.fileroot.children.lock().unwrap().iter() {
             y = self.render_subtree_text(entry, y, indent);
         }
-
-        self.text_handler.lock().unwrap().flush(&device,&mut encoder, frame, size)
+        vertices
     }
 
-    fn render_subtree(&self, root: &DirEntry, mut y: f32, mut indent: f32) -> f32 {
+    fn render_subtree(&self, root: &DirEntry, mut y: f32, mut indent: f32, mut vertex_buffer: Vec<Vertex>) -> (f32,Vec<Vertex>) {
         // Render self, though only if within visible area
         if y >= -self.config.font_size && y <= self.config.tree_height {
             if *root.action.lock().unwrap() == Action::Exclude {
                 // TODO: Draw red rectangle (indent,y,1024.0-indent, self.config.font_size) (x,y,w,h)
+                vertex_buffer.append(&mut Vertex::rect(indent,y,1024.0-indent, self.config.font_size, [1.0,0.0,0.0,1.0]));
             } else if *root.action.lock().unwrap() == Action::Upload {
                 // TODO: Draw green rectangle (indent,y,1024.0-indent, self.config.font_size) (x,y,w,h)
+                vertex_buffer.append(&mut Vertex::rect(indent,y,1024.0-indent, self.config.font_size, [0.0,1.0,0.0,1.0]));
             }
         } else if y > self.config.tree_height {
             // We will never return to the visible area, stop drawing
-            return y;
+            return (y,vertex_buffer);
         }
 
         // Note: step size determined by font_size
@@ -87,16 +94,17 @@ impl UIManager  {
         if *root.expanded.lock().unwrap() {
             indent += 24.0f32;
             for entry in root.children.lock().unwrap().iter() {
-                y = self.render_subtree(entry, y, indent);
+                let res = self.render_subtree(entry, y, indent, vertex_buffer);
+                y = res.0;
+                vertex_buffer = res.1;
             }
         }
-        y
+        (y,vertex_buffer)
     }
 
     fn render_subtree_text(&self, root: &DirEntry, mut y: f32, mut indent: f32) -> f32 {
         // Draw self if within visible area
         if y >= -self.config.font_size && y <= self.config.tree_height {
-            // TODO Draw text (&root.name, indent+2.0, y+self.config.font_size/2.0, self.config.font_size) (text,x,y,size)
             self.text_handler.lock().unwrap().draw(&root.name, indent+2.0, y, self.config.font_size, [1.0,1.0,1.0,1.0]);
         } else if y > self.config.tree_height {
             // We will never return to the visible area, stop drawing
