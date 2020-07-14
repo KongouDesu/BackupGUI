@@ -1,11 +1,14 @@
 use crate::framework;
 use zerocopy::{AsBytes, FromBytes};
 use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
+
 use crate::text;
 use crate::ui;
 use crate::files;
+use crate::ui::UIState;
 use crate::ui::UIConfig;
 use std::sync::Mutex;
+
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
@@ -33,17 +36,17 @@ impl Vertex {
 }
 
 pub struct GuiProgram {
-    vs_module: wgpu::ShaderModule,
-    fs_module: wgpu::ShaderModule,
-    pipeline_layout: wgpu::PipelineLayout,
-    pipeline: wgpu::RenderPipeline,
-    uniforms: wgpu::BindGroup,
-    transform: wgpu::Buffer,
-    multisampled_framebuffer: wgpu::TextureView,
-    rebuild_pipeline: bool,
-    sample_count: u32,
-    sc_desc: wgpu::SwapChainDescriptor,
-    ui_manager: ui::UIManager,
+    pub vs_module: wgpu::ShaderModule,
+    pub fs_module: wgpu::ShaderModule,
+    pub pipeline_layout: wgpu::PipelineLayout,
+    pub pipeline: wgpu::RenderPipeline,
+    pub uniforms: wgpu::BindGroup,
+    pub transform: wgpu::Buffer,
+    pub multisampled_framebuffer: wgpu::TextureView,
+    pub rebuild_pipeline: bool,
+    pub sample_count: u32,
+    pub sc_desc: wgpu::SwapChainDescriptor,
+    pub ui_manager: ui::UIManager,
 }
 
 impl GuiProgram {
@@ -225,6 +228,7 @@ impl GuiProgram {
                 },
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
+                state: UIState::FileTree,
                 cx: 0.0,
                 cy: 0.0,
             }
@@ -330,71 +334,9 @@ impl GuiProgram {
             self.rebuild_pipeline = false;
         }
 
-        let vertices = self.ui_manager.render_file_tree();
-
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-        if !vertices.is_empty() {
-            let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
-
-            let rpass_color_attachment = if self.sample_count == 1 {
-                wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::BLACK,
-                }
-            } else {
-                wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &self.multisampled_framebuffer,
-                    resolve_target: Some(&frame.view),
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::BLACK,
-                }
-            };
-
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[rpass_color_attachment],
-                depth_stencil_attachment: None,
-            });
-
-            rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.uniforms, &[]);
-            rpass.set_vertex_buffer(0, &buffer, 0, 0);
-
-
-            rpass.draw(0..vertices.len() as u32, 0..3);
+        match &self.ui_manager.state {
+            UIState::FileTree => crate::ui::filetree::render(self, frame, device),
+            _ => vec![],
         }
-        let cb1 = encoder.finish();
-
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Text") });
-
-        // Draw on top of previous (i.e., entry background rectangle)
-        {
-            let _ = encoder.begin_render_pass(
-                &wgpu::RenderPassDescriptor {
-                    color_attachments: &[
-                        wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.view,
-                            resolve_target: None,
-                            load_op: wgpu::LoadOp::Load,
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color::BLACK,
-                        },
-                    ],
-                    depth_stencil_attachment: None,
-                },
-            );
-        }
-
-        self.ui_manager.text_handler.lock().unwrap().flush(&device,&mut encoder, frame, (self.sc_desc.width,self.sc_desc.height));
-
-       let cb2 = encoder.finish();
-
-        vec![cb1,cb2]
     }
 }

@@ -12,6 +12,8 @@ use std::path::Path;
 use std::io::BufRead;
 use std::sync::Mutex;
 
+pub mod filetree;
+
 /// Keeps track of the UI state
 pub struct UIManager  {
     // Filesystem roots, i.e. top-most DirEntry
@@ -25,10 +27,19 @@ pub struct UIManager  {
     pub text_handler: Mutex<TextHandler>,
     // How far down the list we've scrolled
     pub scroll: f32,
+    // Which state we're in (and thus, what should be shown/reacted to)
+    pub state: UIState,
 
     // Cursor x and y
     pub cx: f32,
     pub cy: f32,
+}
+
+pub enum UIState {
+    Consent,
+    Main,
+    FileTree,
+    Upload,
 }
 
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
