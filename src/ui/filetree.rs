@@ -7,7 +7,7 @@ pub fn render(
     frame: &wgpu::SwapChainOutput,
     device: &wgpu::Device,
 ) -> Vec<wgpu::CommandBuffer> {
-    let vertices = gui.ui_manager.render_file_tree();
+    let vertices = gui.ui_manager.render_file_tree(&gui.align);
 
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });

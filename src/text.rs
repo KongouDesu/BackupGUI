@@ -1,4 +1,4 @@
-use wgpu_glyph::{ab_glyph, GlyphBrushBuilder, Section, Text, GlyphBrush};
+use wgpu_glyph::{ab_glyph, GlyphBrushBuilder, Section, Text, GlyphBrush, Layout};
 use wgpu_glyph::ab_glyph::FontArc;
 
 pub struct TextHandler {
@@ -19,11 +19,14 @@ impl TextHandler {
     }
 
     // Queues a string to be drawn
-    // Scale is the size of the text in PIXELS
-    pub fn draw(&mut self, text: &str, x: f32, y: f32, scale: f32, color: [f32; 4]) {
+    // size is the size of the text in PIXELS
+    // limit is the max width for the text
+    pub fn draw(&mut self, text: &str, x: f32, y: f32, size: f32, limit: f32, color: [f32; 4]) {
         self.glyph_brush.queue(Section {
             screen_position: (x, y),
-            text: vec![Text::new(text).with_scale(scale).with_color(color)],
+            text: vec![Text::new(text).with_scale(size).with_color(color)],
+            bounds: (limit, f32::INFINITY),
+            layout: Layout::default_single_line(),
             ..Section::default()
         });
     }

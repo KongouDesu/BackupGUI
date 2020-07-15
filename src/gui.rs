@@ -5,6 +5,7 @@ use image;
 
 use crate::text;
 use crate::ui;
+use crate::ui::align::{Anchor,AlignConfig};
 use crate::files;
 use crate::ui::UIState;
 use crate::ui::UIConfig;
@@ -50,13 +51,6 @@ impl TexVertex {
     }
 
     pub fn rect(x: f32, y: f32, w: f32, h: f32, a: f32) -> Vec<Self> {
-        /*
-        vec![
-            Self::new(x,y,0.0,0.0),
-            Self::new(x+w,y,1.0,0.0),
-            Self::new(x,y+h,0.0,1.0),
-            Self::new(x+w,y+h,1.0,1.0),
-        ]*/
         // Compute center
         let cx = x+w/2.0;
         let cy = y+h/2.0;
@@ -93,6 +87,7 @@ pub struct GuiProgram {
     pub tex_fs_module: wgpu::ShaderModule,
     pub tex_pipeline: wgpu::RenderPipeline,
     pub texture_bind_group: wgpu::BindGroup,
+    pub align: AlignConfig,
     pub timer: f32,
 }
 
@@ -388,7 +383,7 @@ impl GuiProgram {
                 },
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
-                state: UIState::Main,
+                state: UIState::FileTree,
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -396,6 +391,11 @@ impl GuiProgram {
             tex_fs_module,
             tex_pipeline: texture_pipeline,
             texture_bind_group,
+            align: AlignConfig {
+                scale: 1.0,
+                win_width: sc_desc.width as f32,
+                win_height: sc_desc.height as f32
+            },
             timer: 0.0,
         };
         (this, Some(init_encoder.finish()))
@@ -407,6 +407,7 @@ impl GuiProgram {
         device: &wgpu::Device,
     ) -> Option<wgpu::CommandBuffer> {
         self.sc_desc = sc_desc.clone();
+        self.align.resize(sc_desc.width as f32, sc_desc.height as f32);
 
         /// Update the transform matrix
         /// 1. Generate new matrix
@@ -446,7 +447,7 @@ impl GuiProgram {
                 delta: winit::event::MouseScrollDelta::LineDelta(_, y),
                 ..
             } => {
-                self.ui_manager.scroll(y*24.0);
+                self.ui_manager.scroll(y*24.0*self.align.scale);
             },
             winit::event::WindowEvent::MouseInput {device_id, state, button, modifiers} => {
                 if state == winit::event::ElementState::Pressed  {
@@ -456,7 +457,7 @@ impl GuiProgram {
                         winit::event::MouseButton::Middle => 3,
                         winit::event::MouseButton::Other(n) => n,
                     };
-                    self.ui_manager.on_click(but);
+                    self.ui_manager.on_click(but, &self.align);
                 }
             },
             winit::event::WindowEvent::CursorMoved {device_id, position, modifiers} => {

@@ -2,6 +2,7 @@ use crate::gui::GuiProgram;
 use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
 use zerocopy::{AsBytes, FromBytes};
 use crate::gui::TexVertex;
+use crate::ui::align::Anchor;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -12,7 +13,8 @@ pub fn render(
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
+    //let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
+    let mut vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 0.0, 600.0, 800.0, 0.0);
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
     let rpass_color_attachment =  {
