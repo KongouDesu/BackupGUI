@@ -220,8 +220,12 @@ impl GuiProgram {
             label: Some("Texture BGL"),
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        let texture_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&uniform_layout, &texture_layout],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&uniform_layout],
         });
 
         /// Create the texture
@@ -305,7 +309,7 @@ impl GuiProgram {
         let tex_fs_module = device.create_shader_module(&tex_fs_bytes);
 
         let texture_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+            layout: &texture_pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &tex_vs_module,
                 entry_point: "main",
