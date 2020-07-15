@@ -121,11 +121,12 @@ fn start(
         *control_flow = if cfg!(feature = "metal-auto-capture") {
             ControlFlow::Exit
         } else {
-            ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(10))
+            ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(5))
         };
         match event {
             event::Event::MainEventsCleared => {
-                if last_update_inst.elapsed() > Duration::from_millis(20) {
+                if last_update_inst.elapsed() > Duration::from_millis(7) {
+                    program.timer += last_update_inst.elapsed().as_secs_f32();
                     window.request_redraw();
                     last_update_inst = Instant::now();
                 }

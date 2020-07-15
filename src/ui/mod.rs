@@ -13,6 +13,7 @@ use std::io::BufRead;
 use std::sync::Mutex;
 
 pub mod filetree;
+pub mod mainmenu;
 
 /// Keeps track of the UI state
 pub struct UIManager  {
@@ -35,6 +36,14 @@ pub struct UIManager  {
     pub cy: f32,
 }
 
+/// Represents what state the program is in
+/// This means what to display and how to react to input
+/// Consent: Inform the user about the program, terms, liability, warranty, affiliation etc.
+///     This is skipped if consent has been already granted
+/// Main: The main menu, when we are not selecting files and not uploading
+///     Contains buttons to go to different states + options menu
+/// FileTree: File tree browser, for selecting what files to upload/exclude
+/// Upload: Displays upload progress + some settings to limit bandwidth usage while uploading
 pub enum UIState {
     Consent,
     Main,

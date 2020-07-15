@@ -1,6 +1,7 @@
 use crate::framework;
 use zerocopy::{AsBytes, FromBytes};
-use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
+use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage, Texture, TextureView};
+use image;
 
 use crate::text;
 use crate::ui;
@@ -8,6 +9,7 @@ use crate::files;
 use crate::ui::UIState;
 use crate::ui::UIConfig;
 use std::sync::Mutex;
+use std::io::Cursor;
 
 
 #[repr(C)]
@@ -16,7 +18,6 @@ pub struct Vertex {
     _pos: [f32; 2],
     _color: [f32; 4],
 }
-
 impl Vertex {
     pub fn new(pos: [f32; 2], color: [f32; 4]) -> Self {
         Vertex {
@@ -35,6 +36,49 @@ impl Vertex {
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
+pub struct TexVertex {
+    pos: [f32; 4], // First 2 indices are (x,y), second are texture (u,v)
+}
+
+impl TexVertex {
+    pub fn new(xy: (f32,f32),u: f32,v: f32) -> Self {
+        TexVertex {
+            pos: [xy.0,xy.1,u,v],
+        }
+    }
+
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, a: f32) -> Vec<Self> {
+        /*
+        vec![
+            Self::new(x,y,0.0,0.0),
+            Self::new(x+w,y,1.0,0.0),
+            Self::new(x,y+h,0.0,1.0),
+            Self::new(x+w,y+h,1.0,1.0),
+        ]*/
+        // Compute center
+        let cx = x+w/2.0;
+        let cy = y+h/2.0;
+        vec![
+            Self::new(rotate_around(x,y,cx,cy,a),0.0,0.0),
+            Self::new(rotate_around(x+w,y,cx,cy,a),1.0,0.0),
+            Self::new(rotate_around(x,y+h,cx,cy,a),0.0,1.0),
+            Self::new(rotate_around(x+w,y+h,cx,cy,a),1.0,1.0),
+        ]
+    }
+}
+
+fn rotate_around(x: f32, y: f32, cx: f32, cy: f32, a: f32) -> (f32,f32) {
+    let sin = a.sin();
+    let cos = a.cos();
+    let x = x - cx;
+    let y = y - cy;
+    let newx = x * cos - y * sin;
+    let newy = x * sin + y * cos;
+    (newx+cx,newy+cy)
+}
+
 pub struct GuiProgram {
     pub vs_module: wgpu::ShaderModule,
     pub fs_module: wgpu::ShaderModule,
@@ -42,11 +86,14 @@ pub struct GuiProgram {
     pub pipeline: wgpu::RenderPipeline,
     pub uniforms: wgpu::BindGroup,
     pub transform: wgpu::Buffer,
-    pub multisampled_framebuffer: wgpu::TextureView,
     pub rebuild_pipeline: bool,
-    pub sample_count: u32,
     pub sc_desc: wgpu::SwapChainDescriptor,
     pub ui_manager: ui::UIManager,
+    pub tex_vs_module: wgpu::ShaderModule,
+    pub tex_fs_module: wgpu::ShaderModule,
+    pub tex_pipeline: wgpu::RenderPipeline,
+    pub texture_bind_group: wgpu::BindGroup,
+    pub timer: f32,
 }
 
 impl GuiProgram {
@@ -56,9 +103,7 @@ impl GuiProgram {
         vs_module: &wgpu::ShaderModule,
         fs_module: &wgpu::ShaderModule,
         pipeline_layout: &wgpu::PipelineLayout,
-        sample_count: u32,
     ) -> wgpu::RenderPipeline {
-        println!("sample_count: {}", sample_count);
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
@@ -92,36 +137,10 @@ impl GuiProgram {
                     attributes: &vertex_attr_array![0 => Float2, 1 => Float4],
                 }],
             },
-            sample_count,
+            sample_count: 1,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         })
-    }
-
-    fn create_multisampled_framebuffer(
-        device: &wgpu::Device,
-        sc_desc: &wgpu::SwapChainDescriptor,
-        sample_count: u32,
-    ) -> wgpu::TextureView {
-        let multisampled_texture_extent = wgpu::Extent3d {
-            width: sc_desc.width,
-            height: sc_desc.height,
-            depth: 1,
-        };
-        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
-            size: multisampled_texture_extent,
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: sample_count,
-            dimension: wgpu::TextureDimension::D2,
-            format: sc_desc.format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            label: None,
-        };
-
-        device
-            .create_texture(multisampled_frame_descriptor)
-            .create_default_view()
     }
 }
 
@@ -142,15 +161,18 @@ impl GuiProgram {
         sc_desc: &wgpu::SwapChainDescriptor,
         device: &wgpu::Device,
     ) -> (Self, Option<wgpu::CommandBuffer>) {
-        println!("Press left/right arrow keys to change sample_count.");
-        let sample_count = 4;
+
+        let mut init_encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Init CE") });
 
 
+        /// Orthographic transform, allows us to render in screen coordinates
         let transform = device.create_buffer_with_data(
             ortho(0.0,sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0).as_bytes(),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
+        /// Uniforms for transform matrix
         let uniform_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("uniforms"),
@@ -177,8 +199,147 @@ impl GuiProgram {
             ],
         });
 
+        /// Bind groups for textures
+        let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            bindings: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        component_type: wgpu::TextureComponentType::Float,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler { comparison: false },
+                },
+            ],
+            label: Some("Texture BGL"),
+        });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&uniform_layout],
+            bind_group_layouts: &[&uniform_layout, &texture_layout],
+        });
+
+        /// Create the texture
+        let img_data = include_bytes!("../image.jpg");
+        let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Jpeg)
+            .unwrap()
+            .to_rgba();
+        let (width, height) = img.dimensions();
+        println!("{}x{}", width, height);
+        let img = img.into_raw();
+        println!("Bytes: {}", img.len());
+
+        let texels = img;
+        let texture_extent = wgpu::Extent3d {
+            width: width,
+            height: height,
+            depth: 1,
+        };
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+            label: None,
+        });
+        let texture_view = texture.create_default_view();
+        let temp_buf =
+            device.create_buffer_with_data(texels.as_slice(), wgpu::BufferUsage::COPY_SRC);
+        init_encoder.copy_buffer_to_texture(
+            wgpu::BufferCopyView {
+                buffer: &temp_buf,
+                offset: 0,
+                bytes_per_row: 4 * width,
+                rows_per_image: 0,
+            },
+            wgpu::TextureCopyView {
+                texture: &texture,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            texture_extent,
+        );
+
+        // Create sampler
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare: wgpu::CompareFunction::Undefined,
+        });
+        // Create bind group
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+            label: None,
+        });
+        let tex_vs_bytes = framework::load_glsl(include_str!("texture.vert"),
+                                                framework::ShaderStage::Vertex);
+        let tex_fs_bytes = framework::load_glsl(include_str!("texture.frag"),
+                                                framework::ShaderStage::Fragment,
+        );
+        let tex_vs_module = device.create_shader_module(&tex_vs_bytes);
+        let tex_fs_module = device.create_shader_module(&tex_fs_bytes);
+
+        let texture_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: &pipeline_layout,
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &tex_vs_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &tex_fs_module,
+                entry_point: "main",
+            }),
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::None,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+            }),
+            primitive_topology: wgpu::PrimitiveTopology::TriangleStrip,
+            color_states: &[wgpu::ColorStateDescriptor {
+                format: sc_desc.format,
+                color_blend: wgpu::BlendDescriptor::REPLACE,
+                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
+            depth_stencil_state: None,
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint16,
+                vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                    stride: std::mem::size_of::<TexVertex>() as wgpu::BufferAddress,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &vertex_attr_array![0 => Float4],
+                }],
+            },
+            sample_count: 1,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
         });
 
         let vs_bytes =
@@ -201,10 +362,7 @@ impl GuiProgram {
             &vs_module,
             &fs_module,
             &pipeline_layout,
-            sample_count,
         );
-        let multisampled_framebuffer =
-            GuiProgram::create_multisampled_framebuffer(device, sc_desc, sample_count);
 
         let vertex_count = 0 as u32;
 
@@ -215,9 +373,7 @@ impl GuiProgram {
             pipeline,
             uniforms,
             transform,
-            multisampled_framebuffer,
             rebuild_pipeline: false,
-            sample_count,
             sc_desc: sc_desc.clone(),
             ui_manager: ui::UIManager {
                 fileroot: files::get_roots().unwrap(),
@@ -228,12 +384,17 @@ impl GuiProgram {
                 },
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
-                state: UIState::FileTree,
+                state: UIState::Main,
                 cx: 0.0,
                 cy: 0.0,
-            }
+            },
+            tex_vs_module,
+            tex_fs_module,
+            tex_pipeline: texture_pipeline,
+            texture_bind_group,
+            timer: 0.0,
         };
-        (this, None)
+        (this, Some(init_encoder.finish()))
     }
 
     pub fn resize(
@@ -242,8 +403,6 @@ impl GuiProgram {
         device: &wgpu::Device,
     ) -> Option<wgpu::CommandBuffer> {
         self.sc_desc = sc_desc.clone();
-        self.multisampled_framebuffer =
-            GuiProgram::create_multisampled_framebuffer(device, sc_desc, self.sample_count);
 
         /// Update the transform matrix
         /// 1. Generate new matrix
@@ -275,18 +434,6 @@ impl GuiProgram {
             winit::event::WindowEvent::KeyboardInput { input, .. } => {
                 if let winit::event::ElementState::Pressed = input.state {
                     match input.virtual_keycode {
-                        Some(winit::event::VirtualKeyCode::Left) => {
-                            if self.sample_count >= 2 {
-                                self.sample_count = self.sample_count >> 1;
-                                self.rebuild_pipeline = true;
-                            }
-                        }
-                        Some(winit::event::VirtualKeyCode::Right) => {
-                            if self.sample_count <= 16 {
-                                self.sample_count = self.sample_count << 1;
-                                self.rebuild_pipeline = true;
-                            }
-                        }
                         _ => {}
                     }
                 }
@@ -327,15 +474,13 @@ impl GuiProgram {
                 &self.vs_module,
                 &self.fs_module,
                 &self.pipeline_layout,
-                self.sample_count,
             );
-            self.multisampled_framebuffer =
-                GuiProgram::create_multisampled_framebuffer(device, &self.sc_desc, self.sample_count);
             self.rebuild_pipeline = false;
         }
 
         match &self.ui_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
+            UIState::Main => crate::ui::mainmenu::render(self, frame, device),
             _ => vec![],
         }
     }

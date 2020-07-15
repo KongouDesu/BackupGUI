@@ -15,18 +15,10 @@ pub fn render(
     if !vertices.is_empty() {
         let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
-        let rpass_color_attachment = if gui.sample_count == 1 {
+        let rpass_color_attachment = {
             wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: &frame.view,
                 resolve_target: None,
-                load_op: wgpu::LoadOp::Clear,
-                store_op: wgpu::StoreOp::Store,
-                clear_color: wgpu::Color::BLACK,
-            }
-        } else {
-            wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &gui.multisampled_framebuffer,
-                resolve_target: Some(&frame.view),
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
                 clear_color: wgpu::Color::BLACK,
