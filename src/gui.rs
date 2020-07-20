@@ -378,7 +378,7 @@ impl GuiProgram {
 
         let vertex_count = 0 as u32;
 
-        let this = GuiProgram {
+        let mut this = GuiProgram {
             vs_module,
             fs_module,
             pipeline_layout,
@@ -389,9 +389,7 @@ impl GuiProgram {
             sc_desc: sc_desc.clone(),
             state_manager: ui::StateManager {
                 fileroot: files::get_roots().unwrap(),
-                config: UIConfig {
-                    font_size: 24.0,
-                },
+                config: UIConfig::deserialize("config.cfg"),
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
                 state: UIState::Main,
@@ -411,6 +409,10 @@ impl GuiProgram {
             },
             timer: 0.0,
         };
+        if std::path::Path::new("backuplist.dat").exists() {
+            this.state_manager.deserialize("backuplist.dat");
+        }
+
         (this, Some(init_encoder.finish()))
     }
 
@@ -475,6 +477,7 @@ impl GuiProgram {
                     let state = match self.state_manager.state {
                         UIState::FileTree => ui::filetree::handle_click(self, but),
                         UIState::Main => ui::mainmenu::handle_click(self),
+                        UIState::Upload => ui::upload::handle_click(self),
                         _ => None,
                     };
                     if state.is_some() {
@@ -508,6 +511,7 @@ impl GuiProgram {
         match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
             UIState::Main => crate::ui::mainmenu::render(self, frame, device),
+            UIState::Upload => crate::ui::upload::render(self, frame, device),
             _ => vec![],
         }
     }

@@ -7,15 +7,17 @@
 use crate::files::{DirEntry, Action};
 use crate::text::TextHandler;
 use crate::gui::{Vertex, GuiProgram};
+use crate::ui::align::{AlignConfig, Anchor};
 
 use std::path::Path;
-use std::io::BufRead;
+use std::io::{BufRead, Write, Read};
 use std::sync::Mutex;
-use crate::ui::align::{AlignConfig, Anchor};
+use nanoserde::{DeJson, SerJson};
 
 pub mod filetree;
 pub mod mainmenu;
 pub mod align;
+pub mod upload;
 
 /// Keeps track of the UI state
 pub struct StateManager {
@@ -55,11 +57,49 @@ pub enum UIState {
 }
 
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
-/// TODO Make serializable so we can read/write to/from a file
+#[derive(Debug,DeJson,SerJson)]
 pub struct UIConfig {
     // Size of the font (in pixels)
     // Note that the size of an element is determined from this
     pub font_size: f32,
+    pub scroll_factor: u8,
+}
+
+impl UIConfig {
+    pub fn serialize<T: AsRef<Path>>(&self, file: T) {
+        let path = file.as_ref();
+        let mut file = std::fs::File::create(path).unwrap();
+
+        let mut buf = self.serialize_json();
+        println!("{:?}",self);
+        println!("{}",buf);
+        let bytes = buf.as_bytes();
+
+        file.write(bytes);
+    }
+
+    pub fn deserialize<T: AsRef<Path>>(file: T) -> UIConfig {
+        let path = file.as_ref();
+        if path.exists() {
+            let mut file = std::fs::File::open(path).unwrap();
+
+            let mut buf = String::new();
+            file.read_to_string(&mut buf);
+
+            DeJson::deserialize_json(&mut buf).unwrap_or(UIConfig::default())
+        } else {
+            UIConfig::default()
+        }
+    }
+}
+
+impl Default for UIConfig {
+    fn default() -> Self {
+        UIConfig {
+            font_size: 24.0,
+            scroll_factor: 1,
+        }
+    }
 }
 
 impl StateManager {
