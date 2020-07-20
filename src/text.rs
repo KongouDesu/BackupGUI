@@ -1,4 +1,4 @@
-use wgpu_glyph::{ab_glyph, GlyphBrushBuilder, Section, Text, GlyphBrush, Layout};
+use wgpu_glyph::{ab_glyph, GlyphBrushBuilder, Section, Text, GlyphBrush, Layout, VerticalAlign, HorizontalAlign, BuiltInLineBreaker};
 use wgpu_glyph::ab_glyph::FontArc;
 
 pub struct TextHandler {
@@ -27,6 +27,20 @@ impl TextHandler {
             text: vec![Text::new(text).with_scale(size).with_color(color)],
             bounds: (limit, f32::INFINITY),
             layout: Layout::default_single_line(),
+            ..Section::default()
+        });
+    }
+
+    pub fn draw_centered(&mut self, text: &str, x: f32, y: f32, size: f32, limit: f32, color: [f32; 4]) {
+        self.glyph_brush.queue(Section {
+            screen_position: (x, y),
+            text: vec![Text::new(text).with_scale(size).with_color(color)],
+            bounds: (limit, f32::INFINITY),
+            layout: Layout::SingleLine {
+                line_breaker: BuiltInLineBreaker::default(),
+                h_align: HorizontalAlign::Center,
+                v_align: VerticalAlign::Center,
+            },
             ..Section::default()
         });
     }

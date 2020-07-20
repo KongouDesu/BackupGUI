@@ -6,7 +6,7 @@
 
 use crate::files::{DirEntry, Action};
 use crate::text::TextHandler;
-use crate::gui::Vertex;
+use crate::gui::{Vertex, GuiProgram};
 
 use std::path::Path;
 use std::io::BufRead;
@@ -18,7 +18,7 @@ pub mod mainmenu;
 pub mod align;
 
 /// Keeps track of the UI state
-pub struct UIManager  {
+pub struct StateManager {
     // Filesystem roots, i.e. top-most DirEntry
     // On Linux, this is the '/' root
     // On Windows, this is all dummy object 'root element' containing the drives i.e. C:\, D:\, E:\ etc.
@@ -51,174 +51,27 @@ pub enum UIState {
     Main,
     FileTree,
     Upload,
+    Options,
 }
 
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
 /// TODO Make serializable so we can read/write to/from a file
 pub struct UIConfig {
-    // Height and width of file tree, in pixels
-    // Note that this is the entire space available for the tree
-    pub tree_width: f32,
-    pub tree_height: f32,
-
     // Size of the font (in pixels)
     // Note that the size of an element is determined from this
     pub font_size: f32,
 }
 
-impl UIManager  {
-    // Renders the file tree
-    // The top-left corner is at (0,0) (in screen coordinates)
-    // Translate the viewport before if it needs to be elsewhere
-    // Note: text handler must be flushed manually to render the text
-    // Returns a vec of vertices representing what it wants to draw
-    pub fn render_file_tree(&self, align: &AlignConfig) -> Vec<Vertex> {
-        let mut y = self.scroll;
-        let mut indent = 0f32;
-        let mut vertices: Vec<Vertex> = Vec::new();
-
-        // Render background, note that font_size determines height
-        for entry in self.fileroot.children.lock().unwrap().iter() {
-            let res = self.render_subtree(entry, y, indent, vertices, align);
-            y = res.0;
-            vertices = res.1;
-        }
-
-        // Render text, note that font_size determines height
-        let mut y = self.scroll;
-        for entry in self.fileroot.children.lock().unwrap().iter() {
-            y = self.render_subtree_text(entry, y, indent, align);
-        }
-        vertices
-    }
-
-    fn render_subtree(&self, root: &DirEntry, mut y: f32, mut indent: f32, mut vertex_buffer: Vec<Vertex>, align: &AlignConfig) -> (f32,Vec<Vertex>) {
-        // Render self, though only if within visible area
-        if y >= -self.config.font_size*align.scale && y <= self.config.tree_height {
-            if *root.action.lock().unwrap() == Action::Exclude {
-                // vertex_buffer.append(&mut Vertex::rect(indent,y,1024.0-indent, self.config.font_size, [1.0,0.0,0.0,1.0]));
-                vertex_buffer.append(&mut align.rectangle(Anchor::TopLeft, indent, y, self.config.tree_width-indent*1.0/align.scale, self.config.font_size, [1.0,0.0,0.0,1.0]));
-            } else if *root.action.lock().unwrap() == Action::Upload {
-                vertex_buffer.append(&mut align.rectangle(Anchor::TopLeft, indent, y, self.config.tree_width-indent*1.0/align.scale, self.config.font_size, [0.0,1.0,0.0,1.0]));
-            }
-        } else if y > self.config.tree_height {
-            // We will never return to the visible area, stop drawing
-            return (y,vertex_buffer);
-        }
-
-        // Note: step size determined by font_size
-        y += self.config.font_size*align.scale;
-
-        // Render children
-        if *root.expanded.lock().unwrap() {
-            indent += 24.0f32*align.scale;
-            for entry in root.children.lock().unwrap().iter() {
-                let res = self.render_subtree(entry, y, indent, vertex_buffer, align);
-                y = res.0;
-                vertex_buffer = res.1;
-            }
-        }
-        (y,vertex_buffer)
-    }
-
-    fn render_subtree_text(&self, root: &DirEntry, mut y: f32, mut indent: f32, align: &AlignConfig) -> f32 {
-        // Draw self if within visible area
-        if y >= -self.config.font_size*align.scale && y <= self.config.tree_height {
-            self.text_handler.lock().unwrap().draw(&root.name, indent+2.0*align.scale, y,
-                                                   self.config.font_size*align.scale, (self.config.tree_width-indent/align.scale-2.0)*align.scale, [1.0,1.0,1.0,1.0]);
-        } else if y > self.config.tree_height {
-            // We will never return to the visible area, stop drawing
-            return y;
-        }
-
-        // Note: step size determined by font_size
-        y += self.config.font_size*align.scale;
-
-        // Render children
-        if *root.expanded.lock().unwrap() {
-            indent += 24.0f32*align.scale;
-            for entry in root.children.lock().unwrap().iter() {
-                y = self.render_subtree_text(entry, y, indent, align);
-            }
-        }
-        y
-    }
-
+impl StateManager {
     // Scroll an amount, uses +/- to scroll up/down
-    pub fn scroll(&mut self, amount: f32) {
-        self.scroll = (self.scroll+amount).min(0.0);
-    }
-
-    // Handle a mouse click, given it's location relative to the top-left corner of the tree
-    // Positive x is right, positive y is down
-    pub fn on_click(&self, button: u8, align: &AlignConfig) {
-        // Offset 'y' based on scroll
-        let mut y = self.cy-self.scroll;
-        println!("Start search {}, button {}", y, button);
-        let mut indent = 0f32;
-        // Render background
-        let mut done;
-        for entry in self.fileroot.children.lock().unwrap().iter() {
-            let temp = self.handle_click(entry, self.cx, y, button, align);
-            y = temp.0;
-            done = temp.1;
-            if done {
-                return
-            }
-        }
+    pub fn scroll(&mut self, amount: f32, scale: f32, max: f32) {
+        self.scroll = (self.scroll+amount*self.config.font_size*scale).min(0.0).max(-max);
     }
 
     pub fn cursor_moved(&mut self, x: f32, y: f32) {
         self.cx = x;
         self.cy = y;
-    }
 
-    // Recursive part of click handling
-    // Each (visible) entry decrement 'y' by font_size (it's height)
-    // Once 'y' is <= font_size, it means we found our entry
-    fn handle_click(&self, entry: &DirEntry, x: f32, mut y: f32, button: u8, align: &AlignConfig) -> (f32, bool) {
-        // Check if we found our entry, if we did, handle the click and stop
-        if y <= self.config.font_size*align.scale {
-            println!("Click {:?}, button {:?}", entry.name, button);
-            if button == 1 {
-                // Toggle visibility
-                if *entry.expanded.lock().unwrap() {
-                    *entry.expanded.lock().unwrap() = false;
-                } else {
-                    // This refreshes the dir and expands it
-                    if !*entry.indexed.lock().unwrap() {
-                        entry.expand();
-                    }
-                    *entry.expanded.lock().unwrap() = true;
-                }
-            } else if button == 2 {
-                // Change action
-                if *entry.action.lock().unwrap() == Action::Exclude {
-                    entry.change_action(Action::Upload);
-                } else if *entry.action.lock().unwrap() == Action::Upload {
-                    entry.change_action(Action::Exclude);
-                }
-            }
-            println!("{:?}", entry.action.lock().unwrap());
-            return (y,true)
-        }
-
-        // If we didn't find it, search further
-        y -= self.config.font_size*align.scale;
-
-        // Notice: Only search expanded (visible) entries, as we cant click invisible ones
-        if *entry.expanded.lock().unwrap() {
-            let mut done;
-            for entry in entry.children.lock().unwrap().iter() {
-                let temp = self.handle_click(entry, x, y, button, align);
-                y = temp.0;
-                done = temp.1;
-                if done {
-                    return (y, true);
-                }
-            }
-        }
-        (y,false)
     }
 
     /// Write the current config to a file

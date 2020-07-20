@@ -7,7 +7,7 @@ use crate::text;
 use crate::ui;
 use crate::ui::align::{Anchor,AlignConfig};
 use crate::files;
-use crate::ui::UIState;
+use crate::ui::{UIState, filetree};
 use crate::ui::UIConfig;
 use std::sync::Mutex;
 use std::io::Cursor;
@@ -32,6 +32,8 @@ impl Vertex {
             Self::new([x,y],color),
             Self::new([x+w,y],color),
             Self::new([x,y+h],color),
+            Self::new([x,y+h],color),
+            Self::new([x+w,y],color),
             Self::new([x+w,y+h],color),
         ]
     }
@@ -50,15 +52,23 @@ impl TexVertex {
         }
     }
 
-    pub fn rect(x: f32, y: f32, w: f32, h: f32, a: f32) -> Vec<Self> {
+    // size is the (w,h) of the texture used
+    // section is the top-left (x,y) and (w,h) for what part of the texture to draw
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, a: f32, size: (f32,f32), section: [f32;4]) -> Vec<Self> {
         // Compute center
         let cx = x+w/2.0;
         let cy = y+h/2.0;
+        let uv_left = section[0]/size.0;
+        let uv_top = section[1]/size.1;
+        let uv_right = (section[0]+section[2])/size.0;
+        let uv_bottom = (section[1]+section[3])/size.1;
         vec![
-            Self::new(rotate_around(x,y,cx,cy,a),0.0,0.0),
-            Self::new(rotate_around(x+w,y,cx,cy,a),1.0,0.0),
-            Self::new(rotate_around(x,y+h,cx,cy,a),0.0,1.0),
-            Self::new(rotate_around(x+w,y+h,cx,cy,a),1.0,1.0),
+            Self::new(rotate_around(x,y,cx,cy,a),uv_left,uv_top),
+            Self::new(rotate_around(x+w,y,cx,cy,a),uv_right,uv_top),
+            Self::new(rotate_around(x,y+h,cx,cy,a),uv_left,uv_bottom),
+            Self::new(rotate_around(x,y+h,cx,cy,a),uv_left,uv_bottom),
+            Self::new(rotate_around(x+w,y,cx,cy,a),uv_right,uv_top),
+            Self::new(rotate_around(x+w,y+h,cx,cy,a),uv_right,uv_bottom),
         ]
     }
 }
@@ -82,7 +92,7 @@ pub struct GuiProgram {
     pub transform: wgpu::Buffer,
     pub rebuild_pipeline: bool,
     pub sc_desc: wgpu::SwapChainDescriptor,
-    pub ui_manager: ui::UIManager,
+    pub state_manager: ui::StateManager,
     pub tex_vs_module: wgpu::ShaderModule,
     pub tex_fs_module: wgpu::ShaderModule,
     pub tex_pipeline: wgpu::RenderPipeline,
@@ -116,7 +126,7 @@ impl GuiProgram {
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
             }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleStrip,
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: sc_desc.format,
                 color_blend: wgpu::BlendDescriptor::REPLACE,
@@ -224,8 +234,8 @@ impl GuiProgram {
         });
 
         /// Create the texture
-        let img_data = include_bytes!("../image.jpg");
-        let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Jpeg)
+        let img_data = include_bytes!("../spritesheet.png");
+        let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Png)
             .unwrap()
             .to_rgba();
         let (width, height) = img.dimensions();
@@ -320,11 +330,19 @@ impl GuiProgram {
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
             }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleStrip,
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: sc_desc.format,
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                color_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::One,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: None,
@@ -350,11 +368,6 @@ impl GuiProgram {
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
-        /*
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[],
-        });*/
-
         let pipeline = GuiProgram::create_pipeline(
             device,
             &sc_desc,
@@ -374,16 +387,14 @@ impl GuiProgram {
             transform,
             rebuild_pipeline: false,
             sc_desc: sc_desc.clone(),
-            ui_manager: ui::UIManager {
+            state_manager: ui::StateManager {
                 fileroot: files::get_roots().unwrap(),
                 config: UIConfig {
-                    tree_width: 1024.0,
-                    tree_height: 1024.0,
                     font_size: 24.0,
                 },
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
-                state: UIState::FileTree,
+                state: UIState::Main,
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -394,7 +405,9 @@ impl GuiProgram {
             align: AlignConfig {
                 scale: 1.0,
                 win_width: sc_desc.width as f32,
-                win_height: sc_desc.height as f32
+                win_height: sc_desc.height as f32,
+                tex_width: width as f32,
+                tex_height: height as f32,
             },
             timer: 0.0,
         };
@@ -447,7 +460,9 @@ impl GuiProgram {
                 delta: winit::event::MouseScrollDelta::LineDelta(_, y),
                 ..
             } => {
-                self.ui_manager.scroll(y*24.0*self.align.scale);
+                let max = filetree::compute_max_scroll(self);
+
+                self.state_manager.scroll(y, self.align.scale, max);
             },
             winit::event::WindowEvent::MouseInput {device_id, state, button, modifiers} => {
                 if state == winit::event::ElementState::Pressed  {
@@ -457,11 +472,18 @@ impl GuiProgram {
                         winit::event::MouseButton::Middle => 3,
                         winit::event::MouseButton::Other(n) => n,
                     };
-                    self.ui_manager.on_click(but, &self.align);
+                    let state = match self.state_manager.state {
+                        UIState::FileTree => ui::filetree::handle_click(self, but),
+                        UIState::Main => ui::mainmenu::handle_click(self),
+                        _ => None,
+                    };
+                    if state.is_some() {
+                        self.state_manager.state = state.unwrap();
+                    }
                 }
             },
             winit::event::WindowEvent::CursorMoved {device_id, position, modifiers} => {
-                self.ui_manager.cursor_moved(position.x as f32, position.y as f32);
+                self.state_manager.cursor_moved(position.x as f32, position.y as f32);
             }
             _ => {}
         }
@@ -483,7 +505,7 @@ impl GuiProgram {
             self.rebuild_pipeline = false;
         }
 
-        match &self.ui_manager.state {
+        match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
             UIState::Main => crate::ui::mainmenu::render(self, frame, device),
             _ => vec![],
