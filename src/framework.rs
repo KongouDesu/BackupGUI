@@ -6,6 +6,7 @@ use winit::{
 };
 use crate::gui::GuiProgram;
 
+#[allow(dead_code)]
 pub enum ShaderStage {
     Vertex,
     Fragment,

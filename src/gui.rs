@@ -171,13 +171,13 @@ impl GuiProgram {
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Init CE") });
 
 
-        /// Orthographic transform, allows us to render in screen coordinates
+        // Orthographic transform, allows us to render in screen coordinates
         let transform = device.create_buffer_with_data(
             ortho(0.0,sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0).as_bytes(),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
-        /// Uniforms for transform matrix
+        // Uniforms for transform matrix
         let uniform_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("uniforms"),
@@ -204,7 +204,7 @@ impl GuiProgram {
             ],
         });
 
-        /// Bind groups for textures
+        // Bind groups for textures
         let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutEntry {
@@ -233,7 +233,7 @@ impl GuiProgram {
             bind_group_layouts: &[&uniform_layout],
         });
 
-        /// Create the texture
+        // Create the texture
         let img_data = include_bytes!("../spritesheet.png");
         let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Png)
             .unwrap()
@@ -388,11 +388,12 @@ impl GuiProgram {
             rebuild_pipeline: false,
             sc_desc: sc_desc.clone(),
             state_manager: ui::StateManager {
-                fileroot: files::get_roots().unwrap(),
-                config: UIConfig::deserialize("config.cfg"),
+                fileroot: Some(files::get_roots().unwrap()),
+                config: UIConfig::from_file("config.cfg"),
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
                 state: UIState::Main,
+                upload_state: Default::default(),
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -424,20 +425,20 @@ impl GuiProgram {
         self.sc_desc = sc_desc.clone();
         self.align.resize(sc_desc.width as f32, sc_desc.height as f32);
 
-        /// Update the transform matrix
-        /// 1. Generate new matrix
+        // Update the transform matrix
+        // 1. Generate new matrix
         let transform = ortho(0.0, sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0);
-        /// 2. Create buffer
+        // 2. Create buffer
         let transform_buffer = device.create_buffer_with_data(
             transform.as_bytes(),
             wgpu::BufferUsage::COPY_SRC,
         );
 
-        /// 3. Create encoder to copy
+        // 3. Create encoder to copy
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Resize encoder") });
 
-        /// 4. Copy to transform buffer
+        // 4. Copy to transform buffer
         encoder.copy_buffer_to_buffer(
             &transform_buffer,
             0,
@@ -481,7 +482,14 @@ impl GuiProgram {
                         _ => None,
                     };
                     if state.is_some() {
-                        self.state_manager.state = state.unwrap();
+                        let state = state.unwrap();
+                        match state{
+                            UIState::Upload => {
+                                ui::upload::start(self);
+                            }
+                            _ => ()
+                        };
+                        self.state_manager.state = state;
                     }
                 }
             },

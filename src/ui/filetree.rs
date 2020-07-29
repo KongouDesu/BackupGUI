@@ -119,7 +119,7 @@ fn render_file_tree(gui: &crate::GuiProgram) -> Vec<Vertex> {
     let mut vertices: Vec<Vertex> = Vec::new();
 
     // Render background, note that font_size determines height
-    for entry in gui.state_manager.fileroot.children.lock().unwrap().iter() {
+    for entry in gui.state_manager.fileroot.as_ref().unwrap().children.lock().unwrap().iter() {
         let res = render_subtree(gui, entry, y, indent, vertices);
         y = res.0;
         vertices = res.1;
@@ -127,7 +127,7 @@ fn render_file_tree(gui: &crate::GuiProgram) -> Vec<Vertex> {
 
     // Render text, note that font_size determines height
     let mut y = gui.state_manager.scroll + 32.0*gui.align.scale;
-    for entry in gui.state_manager.fileroot.children.lock().unwrap().iter() {
+    for entry in gui.state_manager.fileroot.as_ref().unwrap().children.lock().unwrap().iter() {
         y = render_subtree_text(gui, entry, y, indent);
     }
     vertices
@@ -198,7 +198,7 @@ pub fn handle_click(gui: &GuiProgram, button: u8) -> Option<UIState> {
         println!("Start search {}, button {}", y, button);
 
         // Iterate over items in the root node, stopping if we click was handled
-        for entry in gui.state_manager.fileroot.children.lock().unwrap().iter() {
+        for entry in gui.state_manager.fileroot.as_ref().unwrap().children.lock().unwrap().iter() {
             let temp = handle_click_rec(gui, entry, 0.0, y, button);
             y = temp.0;
             if temp.1 { // If we found what we clicked on, stop
@@ -262,7 +262,7 @@ fn handle_click_rec(gui: &GuiProgram, entry: &DirEntry, x: f32, mut y: f32, butt
 // This value is equal to the total visible size of the tree minus the size of one entry
 pub fn compute_max_scroll(gui: &GuiProgram) -> f32 {
     let mut height = 0.0;
-    for entry in gui.state_manager.fileroot.children.lock().unwrap().iter() {
+    for entry in gui.state_manager.fileroot.as_ref().unwrap().children.lock().unwrap().iter() {
         height += get_height_rec(gui, entry, 0.0);
     }
     height - gui.state_manager.config.font_size*gui.align.scale

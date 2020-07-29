@@ -14,14 +14,7 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::cmp::Ordering;
 
-pub fn print_files() {
-    let x = Path::new("/../");
-    for e in x.read_dir().unwrap() {
-        if let Ok(p) = e {
-            println!("{:?}", p);
-        }
-    }
-}
+pub mod tracked_reader;
 
 // On Linux, we have the single root '/' instead of drives
 // On Windows, there can be any number of drives, so we need to fetch them all
@@ -30,7 +23,6 @@ pub fn print_files() {
 #[cfg(windows)]
 pub fn get_roots() -> Result<DirEntry,&'static str> {
     use winapi::um::fileapi::GetLogicalDriveStringsW;
-    use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
 
     // Returns paths as e.g. "C:\\\u{0}" ('C' ':' '\' '<null>')
@@ -51,7 +43,7 @@ pub fn get_roots() -> Result<DirEntry,&'static str> {
         // Dummy root element
         // This is the root node of the file tree, which is invisible to the user and holds the drives
         // It can be seen as a list of drives, e.g. [C:/,D:/] used to "emulate" the Linux '/' root
-        let mut root_element = DirEntry {
+        let root_element = DirEntry {
             kind: EntryKind::Directory,
             name: "".to_string(),
             path: "".to_string(),
@@ -136,7 +128,7 @@ pub enum Action {
 ///
 /// Note that the path "" (blank) is RESERVED, as it is used by the root node
 /// This means a path on windows is represented (blank)/C:/Users/(...)
-/// Calling any functions on the root node is Undefined Behavior
+/// Calling any functions other than get_files_for_upload() the root node is Undefined Behavior
 #[derive(Debug,Clone)]
 pub struct DirEntry {
     pub kind: EntryKind,
@@ -268,10 +260,10 @@ impl DirEntry {
     pub fn serialize_rec(&self, file: &mut File, mark: bool) {
         let mut mark = mark;
         if *self.action.lock().unwrap() == Action::Upload && mark == false {
-            file.write(format!("UPLOAD {}\n",self.path).as_bytes());
+            file.write(format!("UPLOAD {}\n",self.path).as_bytes()).unwrap();
             mark = true;
         } else if *self.action.lock().unwrap() == Action::Exclude && mark == true {
-            file.write(format!("EXCLUDE {}\n",self.path).as_bytes());
+            file.write(format!("EXCLUDE {}\n",self.path).as_bytes()).unwrap();
             mark = false;
         }
 

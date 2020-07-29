@@ -20,6 +20,7 @@ pub struct AlignConfig {
     pub tex_height: f32,
 }
 
+#[allow(dead_code)]
 pub enum Anchor {
     TopLeft,
     TopRight,

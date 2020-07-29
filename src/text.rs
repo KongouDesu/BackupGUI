@@ -37,11 +37,10 @@ impl TextHandler {
             text: vec![Text::new(text).with_scale(size).with_color(color)],
             bounds: (limit, f32::INFINITY),
             layout: Layout::SingleLine {
-                line_breaker: BuiltInLineBreaker::default(),
+                line_breaker: BuiltInLineBreaker::AnyCharLineBreaker, // Apparently UnicodeLineBreaker is weird with '/'
                 h_align: HorizontalAlign::Center,
                 v_align: VerticalAlign::Center,
             },
-            ..Section::default()
         });
     }
 
