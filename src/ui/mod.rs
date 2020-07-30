@@ -18,6 +18,7 @@ pub mod filetree;
 pub mod mainmenu;
 pub mod align;
 pub mod upload;
+pub mod purge;
 
 /// Keeps track of the UI state
 pub struct StateManager {
@@ -25,7 +26,7 @@ pub struct StateManager {
     // On Linux, this is the '/' root
     // On Windows, this is all dummy object 'root element' containing the drives i.e. C:\, D:\, E:\ etc.
     // See the files module for further explanation
-    pub fileroot: Option<DirEntry>,
+    pub fileroot: DirEntry,
     // Config, i.e. font size and other persistent info
     pub config: UIConfig,
     // Text handler to draw text
@@ -44,6 +45,8 @@ pub struct StateManager {
 pub struct UploadState {
     // Whether or not we're currently uploading
     pub running: bool,
+    // Whether or not purge is running
+    pub purging: bool,
     // Each of the concurrent upload threads
     pub instances: Arc<Mutex<Vec<UploadInstance>>>,
     // Queue of files to be uploaded, shared between threads
@@ -66,6 +69,7 @@ impl Default for UploadState {
         }
         UploadState {
             running: false,
+            purging: false,
             instances: Arc::new(Mutex::new(instances)),
             queue: Arc::new(Mutex::new(vec![])),
         }
@@ -94,6 +98,7 @@ pub struct UploadInstance {
 ///     Contains buttons to go to different states + options menu
 /// FileTree: File tree browser, for selecting what files to upload/exclude
 /// Upload: Displays upload progress + some settings to limit bandwidth usage while uploading
+/// Purge: Switched to after upload, gets rid of files in the cloud that are no longer on the drive (B2 hide)
 #[allow(dead_code)]
 pub enum UIState {
     Consent,
@@ -101,6 +106,7 @@ pub enum UIState {
     FileTree,
     Upload,
     Options,
+    Purge,
 }
 
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
@@ -110,6 +116,7 @@ pub struct UIConfig {
     // Note that the size of an element is determined from this
     pub font_size: f32,
     pub scroll_factor: u8,
+    pub bucket_id: String,
 }
 
 impl UIConfig {
@@ -131,6 +138,7 @@ impl Default for UIConfig {
         UIConfig {
             font_size: 24.0,
             scroll_factor: 1,
+            bucket_id: "".to_string(),
         }
     }
 }
@@ -169,7 +177,7 @@ impl StateManager {
         let path = file.as_ref();
         let mut file = std::fs::File::create(path).unwrap();
 
-        for child in self.fileroot.as_ref().unwrap().children.lock().unwrap().iter() {
+        for child in self.fileroot.children.lock().unwrap().iter() {
             child.serialize_rec(&mut file, false);
         }
     }
@@ -189,11 +197,11 @@ impl StateManager {
             if line.starts_with("UPLOAD ") {
                 // offset 7 for "UPLOAD " (note the space)
                 println!("Trying to expand (upload) - {}" , &line[7..]);
-                self.fileroot.as_ref().unwrap().expand_for_path(&line[7..], Action::Upload);
+                self.fileroot.expand_for_path(&line[7..], Action::Upload);
             } else if line.starts_with("EXCLUDE ") {
                 // offset 8 for "EXCLUDE " (note the space)
                 println!("Trying to expand (exclude) - {}" , &line[8..]);
-                self.fileroot.as_ref().unwrap().expand_for_path(&line[8..], Action::Exclude);
+                self.fileroot.expand_for_path(&line[8..], Action::Exclude);
             } else {
                 println!("Malformed entry - {}", line);
             }

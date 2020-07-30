@@ -388,7 +388,7 @@ impl GuiProgram {
             rebuild_pipeline: false,
             sc_desc: sc_desc.clone(),
             state_manager: ui::StateManager {
-                fileroot: Some(files::get_roots().unwrap()),
+                fileroot: files::get_roots().unwrap(),
                 config: UIConfig::from_file("config.cfg"),
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
@@ -520,6 +520,7 @@ impl GuiProgram {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
             UIState::Main => crate::ui::mainmenu::render(self, frame, device),
             UIState::Upload => crate::ui::upload::render(self, frame, device),
+            UIState::Purge => crate::ui::purge::render(self, frame, device),
             _ => vec![],
         }
     }

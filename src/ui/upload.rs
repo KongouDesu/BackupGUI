@@ -1,18 +1,20 @@
-use crate::gui::{GuiProgram, Vertex};
-use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
-use zerocopy::{AsBytes, FromBytes};
-use crate::gui::TexVertex;
-use crate::ui::align::Anchor;
-use crate::ui::{UIState, UploadInstance};
-use crate::files::{DirEntry, EntryKind, Action};
-use std::sync::{Mutex, Arc};
 use std::path::PathBuf;
-use scoped_pool::Pool;
-use raze;
-use reqwest;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use raze;
 use raze::api::Sha1Variant;
+use reqwest;
+use scoped_pool::Pool;
+use wgpu::{BufferDescriptor, BufferUsage, vertex_attr_array};
+use zerocopy::{AsBytes, FromBytes};
+
+use crate::files::{Action, DirEntry, EntryKind};
 use crate::files::tracked_reader::TrackedReader;
+use crate::gui::{GuiProgram, Vertex};
+use crate::gui::TexVertex;
+use crate::ui::{UIState, UploadInstance};
+use crate::ui::align::Anchor;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -135,17 +137,18 @@ pub fn start(gui: &mut GuiProgram) {
 
 
     // Start the thread that queues files for upload
-    let r = gui.state_manager.fileroot.take().unwrap();
+    let r = gui.state_manager.fileroot.clone();
     let q = gui.state_manager.upload_state.queue.clone();
     std::thread::spawn(move || r.get_files_for_upload(&q));
 
     // Start the upload threads
     let q = gui.state_manager.upload_state.queue.clone();
     let i = gui.state_manager.upload_state.instances.clone();
-    std::thread::spawn(move || start_upload_threads(q, i));
+    let bid = gui.state_manager.config.bucket_id.clone();
+    std::thread::spawn(move || start_upload_threads(q, i, &bid));
 }
 
-fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>) {
+fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str) {
     println!("Starting upload, getting file info on stored files");
     // TODO(?) don't hardcode thread count as 8
     let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
@@ -160,12 +163,11 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
     // TODO Handle missing auth gracefully
     let auth = raze::util::authenticate_from_file(&client,"credentials").unwrap();
     // TODO Load and use bucket from config
-    const BUCKET_ID: &str = "d6f36e3c6239033066000e13";
 
     // Get all files stored on the server
     // We need this to get the 'last changed' metatdata, which we use to determine
     // if the file has changed and needs to be re-uploaded
-    let mut stored_file_list = Arc::new(raze::util::list_all_files(&client, &auth, BUCKET_ID, 1000).unwrap().files);
+    let mut stored_file_list = Arc::new(raze::util::list_all_files(&client, &auth, bucket_id, 1000).unwrap().files);
     // Sort so we can binary search later
     Arc::get_mut(&mut stored_file_list).unwrap().sort();
     println!("Got {} files from remote", stored_file_list.len());
@@ -181,7 +183,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
             let instance_handle = instances.clone();
             let instance_num = i;
             scope.execute(move || {
-                let upauth = raze::api::b2_get_upload_url(&client, &auth, BUCKET_ID).unwrap();
+                let upauth = raze::api::b2_get_upload_url(&client, &auth, bucket_id).unwrap();
                 loop {
                     // Try and get work, if it fails, sleep and check again
                     let p = {
@@ -204,7 +206,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                         file_name: path_str.clone(),
                         file_id: None,
                         account_id: auth.account_id.clone(),
-                        bucket_id: BUCKET_ID.to_string(),
+                        bucket_id: bucket_id.to_string(),
                         content_length: 0,
                         content_sha1: None,
                         content_type: None,
@@ -239,6 +241,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                     }
                     println!("Uploading {:?}", path_str);
 
+
                     // Try uploading up to 5 times
                     for attempts in 0..5 {
                         let file = match std::fs::File::open(&path) {
@@ -258,12 +261,13 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                             inst.sender.clone()
                         };
 
+                        // Note that 'TrackedReader' has to be _after_ 'HashAtEnd' or it would read 40 bytes extra from the hash!
                         let file =
-                            TrackedReader::wrap(
-                                raze::util::ReadThrottled::wrap(
-                                    raze::util::ReadHashAtEnd::wrap(file),
-                                    bandwidth),
-                                tx
+                            raze::util::ReadThrottled::wrap(
+                                raze::util::ReadHashAtEnd::wrap(
+                                    TrackedReader::wrap(file, tx),
+                                ),
+                                bandwidth
                             );
 
                         let params = raze::api::FileParameters {

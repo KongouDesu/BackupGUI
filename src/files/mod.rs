@@ -282,7 +282,6 @@ impl DirEntry {
     /// If 'some' is found, it is expanded and it'll search for 'path'
     /// etc.
     pub fn expand_for_path(&self, path: &str, action: Action) {
-        println!("Start search for {}", path);
         let x = path.find('/');
         let name;
         let remainder;
@@ -301,7 +300,6 @@ impl DirEntry {
             // Find name without trailing '/'
             let child_name = child.name.replace("/","");
 
-            println!("{} - {}", child_name, name);
             if child_name == name {
                 // Nothing left: we have a file
                 // Only consists of '/', assume it is trailing and change the action
@@ -309,7 +307,6 @@ impl DirEntry {
                 if remainder.len() == 0 || remainder == "/" {
                     child.change_action(action);
                 } else {
-                    println!("Remainder {}", remainder);
                     child.expand();
                     child.expand_for_path(remainder, action);
                     return;
