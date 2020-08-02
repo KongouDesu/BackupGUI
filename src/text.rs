@@ -27,7 +27,6 @@ impl TextHandler {
             text: vec![Text::new(text).with_scale(size).with_color(color)],
             bounds: (limit, f32::INFINITY),
             layout: Layout::default_single_line(),
-            ..Section::default()
         });
     }
 

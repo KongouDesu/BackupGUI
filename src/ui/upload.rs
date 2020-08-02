@@ -2,9 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use raze;
 use raze::api::Sha1Variant;
-use reqwest;
 use scoped_pool::Pool;
 use wgpu::BufferUsage;
 use zerocopy::AsBytes;
@@ -137,7 +135,7 @@ pub fn start(gui: &mut GuiProgram) {
     let q = gui.state_manager.upload_state.queue.clone();
     let i = gui.state_manager.upload_state.instances.clone();
     let bid = gui.state_manager.config.bucket_id.clone();
-    let bw = gui.state_manager.config.bandwidth_limit.clone();
+    let bw = gui.state_manager.config.bandwidth_limit;
     std::thread::spawn(move || start_upload_threads(q, i, &bid, bw));
 }
 

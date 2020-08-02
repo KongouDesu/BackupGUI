@@ -1,7 +1,6 @@
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
-use image;
 use nanoserde::SerJson;
 use wgpu::vertex_attr_array;
 use zerocopy::{AsBytes, FromBytes};
@@ -55,7 +54,7 @@ impl TexVertex {
 
     // size is the (w,h) of the texture used
     // section is the top-left (x,y) and (w,h) for what part of the texture to draw
-    pub fn rect(x: f32, y: f32, w: f32, h: f32, a: f32, size: (f32,f32), section: [f32;4]) -> Vec<Self> {
+    pub fn rect(x: f32, y: f32, w: f32, h: f32, angle: f32, size: (f32, f32), section: [f32;4]) -> Vec<Self> {
         // Compute center
         let cx = x+w/2.0;
         let cy = y+h/2.0;
@@ -64,12 +63,12 @@ impl TexVertex {
         let uv_right = (section[0]+section[2])/size.0;
         let uv_bottom = (section[1]+section[3])/size.1;
         vec![
-            Self::new(rotate_around(x,y,cx,cy,a),uv_left,uv_top),
-            Self::new(rotate_around(x+w,y,cx,cy,a),uv_right,uv_top),
-            Self::new(rotate_around(x,y+h,cx,cy,a),uv_left,uv_bottom),
-            Self::new(rotate_around(x,y+h,cx,cy,a),uv_left,uv_bottom),
-            Self::new(rotate_around(x+w,y,cx,cy,a),uv_right,uv_top),
-            Self::new(rotate_around(x+w,y+h,cx,cy,a),uv_right,uv_bottom),
+            Self::new(rotate_around(x, y, cx, cy, angle), uv_left, uv_top),
+            Self::new(rotate_around(x+w, y, cx, cy, angle), uv_right, uv_top),
+            Self::new(rotate_around(x, y+h, cx, cy, angle), uv_left, uv_bottom),
+            Self::new(rotate_around(x, y+h, cx, cy, angle), uv_left, uv_bottom),
+            Self::new(rotate_around(x+w, y, cx, cy, angle), uv_right, uv_top),
+            Self::new(rotate_around(x+w, y+h, cx, cy, angle), uv_right, uv_bottom),
         ]
     }
 }
@@ -246,8 +245,8 @@ impl GuiProgram {
 
         let texels = img;
         let texture_extent = wgpu::Extent3d {
-            width: width,
-            height: height,
+            width,
+            height,
             depth: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -489,14 +488,8 @@ impl GuiProgram {
                         UIState::Consent => ui::consent::handle_click(self),
                         _ => None,
                     };
-                    if state.is_some() {
-                        let state = state.unwrap();
-                        match state{
-                            UIState::Upload => {
-                                ui::upload::start(self);
-                            }
-                            _ => ()
-                        };
+                    if let Some(state) = state {
+                        if let UIState::Upload = state { ui::upload::start(self); }
                         self.state_manager.state = state;
                     }
                 }
@@ -527,7 +520,7 @@ impl GuiProgram {
         //// Check if we should swap state
         let next = match &self.state_manager.state {
             UIState::Purge => {
-                if *self.state_manager.is_purge_done.lock().unwrap() == true {
+                if *self.state_manager.is_purge_done.lock().unwrap() {
                     Some(UIState::Main)
                 } else {
                     None
@@ -535,9 +528,7 @@ impl GuiProgram {
             }
             _ => None,
         };
-        if next.is_some() {
-            self.state_manager.state = next.unwrap();
-        }
+        if let Some(next) = next { self.state_manager.state = next; }
 
         match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),

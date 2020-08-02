@@ -52,7 +52,7 @@ pub fn get_roots() -> Result<DirEntry,&'static str> {
             expanded: Arc::new(Mutex::new(true))
         };
         // Add found rives to the root element
-        for x in drive_string.split("\0").filter(|x| !x.is_empty()) {
+        for x in drive_string.split('\0').filter(|x| !x.is_empty()) {
             let name = x.replace("\\","/");
             root_element.children.lock().unwrap().push(
                 DirEntry {
@@ -185,7 +185,7 @@ impl DirEntry {
     pub fn expand(&self) {
         println!("{:?}", self.path);
         // Only index once, see 'refresh_children'
-        if *self.indexed.lock().unwrap() == true {
+        if *self.indexed.lock().unwrap() {
             return;
         }
 
@@ -225,6 +225,7 @@ impl DirEntry {
                         action: Arc::new(Mutex::new(*self.action.lock().unwrap())),
                         children: Arc::new(Mutex::new(vec![])),
                         indexed: Arc::new(Mutex::new(false)),
+
                         expanded: Arc::new(Mutex::new(false)),
                     }
                 )
@@ -251,11 +252,11 @@ impl DirEntry {
     /// It is flipped to 'false' and the node written if we encounter an 'exclude' while it is true
     pub fn serialize_rec(&self, file: &mut File, mark: bool) {
         let mut mark = mark;
-        if *self.action.lock().unwrap() == Action::Upload && mark == false {
-            file.write(format!("UPLOAD {}\n",self.path).as_bytes()).unwrap();
+        if *self.action.lock().unwrap() == Action::Upload && !mark {
+            file.write_all(format!("UPLOAD {}\n",self.path).as_bytes()).unwrap();
             mark = true;
-        } else if *self.action.lock().unwrap() == Action::Exclude && mark == true {
-            file.write(format!("EXCLUDE {}\n",self.path).as_bytes()).unwrap();
+        } else if *self.action.lock().unwrap() == Action::Exclude && mark {
+            file.write_all(format!("EXCLUDE {}\n",self.path).as_bytes()).unwrap();
             mark = false;
         }
 
@@ -296,7 +297,7 @@ impl DirEntry {
                 // Nothing left: we have a file
                 // Only consists of '/', assume it is trailing and change the action
                 // Does not end with '/', it's a file
-                if remainder.len() == 0 || remainder == "/" {
+                if remainder.is_empty() || remainder == "/" {
                     child.change_action(action);
                 } else {
                     child.expand();
@@ -335,7 +336,7 @@ impl DirEntry {
             if entry.kind == EntryKind::File && *entry.action.lock().unwrap() == Action::Upload {
                 buffer.push(PathBuf::from(entry.path.clone()));
             } else if entry.kind == EntryKind::Directory {
-                if *entry.indexed.lock().unwrap() == true {
+                if *entry.indexed.lock().unwrap() {
                     entry.get_files(queue);
                 } else if *entry.action.lock().unwrap() == Action::Upload {
                     get_files_all(entry.path.clone(), queue);

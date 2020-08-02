@@ -94,25 +94,25 @@ pub fn render(
     // Draw options
     th.draw_centered("Font size", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 100.0 ,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&format!("{}", gui.state_manager.strings.font_size),
+    th.draw_centered(&gui.state_manager.strings.font_size,
                                                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 100.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     th.draw_centered("Scroll speed", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 50.0 ,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&format!("{}", gui.state_manager.strings.scroll_factor),
+    th.draw_centered(&gui.state_manager.strings.scroll_factor,
                                                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 50.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     th.draw_centered("Bucket ID", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&format!("{}", gui.state_manager.strings.bucket_id),
+    th.draw_centered(&gui.state_manager.strings.bucket_id,
                                                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     th.draw_centered("Bandwidth limit (KB/s)", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 + 50.0 ,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&format!("{}", gui.state_manager.strings.bandwidth_limit),
+    th.draw_centered(&gui.state_manager.strings.bandwidth_limit,
                                                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 + 50.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
@@ -283,6 +283,4 @@ pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, _mods: &Modif
             }
         }
     }
-
-    ()
 }

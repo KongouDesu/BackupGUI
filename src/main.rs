@@ -1,3 +1,5 @@
+#![allow(clippy::mutex_atomic)]
+
 mod framework;
 
 mod gui;

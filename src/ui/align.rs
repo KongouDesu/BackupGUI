@@ -68,41 +68,43 @@ impl AlignConfig {
     // 'section' is the top-left (x,y) coordinates and (w,h) (in pixels) of the image to draw
     // this lets us draw only part of the image
     // If the section is 'None', the whole image will be used
-    pub fn image(&self, anchor: Anchor, x: f32, y: f32, w: f32, h: f32, a: f32, section: Option<[f32;4]>) -> Vec<TexVertex> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn image(&self, anchor: Anchor, x: f32, y: f32, w: f32, h: f32, angle: f32, section: Option<[f32;4]>) -> Vec<TexVertex> {
         let x = x*self.scale;
         let y = y*self.scale;
         let w = w*self.scale;
         let h = h*self.scale;
         let section = match section {
-            Some(s) => s,
+            Some(sec) => sec,
             None => [0.0,0.0,self.tex_width,self.tex_height],
         };
         match anchor {
             Anchor::TopLeft => {
-                TexVertex::rect(x,y,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(x, y, w, h, angle, (self.tex_width, self.tex_height), section)
             },
             Anchor::TopRight => {
-                TexVertex::rect(self.win_width-x-w,y,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(self.win_width-x-w, y, w, h, angle, (self.tex_width, self.tex_height), section)
             },
             Anchor::BottomLeft => {
-                TexVertex::rect(x,self.win_height-y-h,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(x, self.win_height-y-h, w, h, angle, (self.tex_width, self.tex_height), section)
             },
             Anchor::BottomRight => {
-                TexVertex::rect(self.win_width-x-w,self.win_height-y-h,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(self.win_width-x-w, self.win_height-y-h, w, h, angle, (self.tex_width, self.tex_height), section)
             },
             Anchor::CenterLocal => {
-                TexVertex::rect(x-w/2.0,y-h/2.0,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(x-w/2.0, y-h/2.0, w, h, angle, (self.tex_width, self.tex_height), section)
             },
             Anchor::CenterGlobal => {
                 let nx = self.win_width/2.0 + x;
                 let ny = self.win_height/2.0 + y;
-                TexVertex::rect(nx-w/2.0,ny-h/2.0,w,h,a,(self.tex_width,self.tex_height),section)
+                TexVertex::rect(nx-w/2.0, ny-h/2.0, w, h, angle, (self.tex_width, self.tex_height), section)
             }
         }
     }
 
     // Returns 'true' if (cx,cy) was inside thw (x,y,w,h) rectangle, false otherwise
     // Handles scaling of coordinates and area size
+    #[allow(clippy::too_many_arguments)]
     pub fn was_area_clicked(&self, anchor: Anchor, cx: f32, cy: f32, x: f32, y: f32, w: f32, h: f32) -> bool {
         let x = x*self.scale;
         let y = y*self.scale;
@@ -133,9 +135,5 @@ impl AlignConfig {
 
 // Helper for 'was_area_clicked'
 fn inside_rect(cx: f32, cy: f32, x: f32, y: f32, w: f32, h: f32) -> bool {
-    if cx >= x && cx <= x+w && cy >= y && cy <= y+h {
-        true
-    } else {
-        false
-    }
+    cx >= x && cx <= x+w && cy >= y && cy <= y+h
 }

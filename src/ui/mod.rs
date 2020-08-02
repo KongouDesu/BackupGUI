@@ -158,18 +158,12 @@ impl GUIConfigStrings {
     pub fn destring(&mut self, cfg: &mut GUIConfig) {
         let s = self.font_size.trim();
         let fs = f32::from_str(s);
-        match fs {
-            Ok(n) => {cfg.font_size = n.max(4.0).min(1024.0);}
-            Err(_) => (),
-        }
+        if let Ok(n) = fs {cfg.font_size = n.max(4.0).min(1024.0);}
         self.font_size = cfg.font_size.to_string();
 
         let s = self.scroll_factor.trim();
         let fs = u32::from_str(s);
-        match fs {
-            Ok(n) => {cfg.scroll_factor = n.max(1).min(128) as u8;}
-            Err(_) => (),
-        }
+        if let Ok(n) = fs {cfg.scroll_factor = n.max(1).min(128) as u8;}
         self.scroll_factor = cfg.scroll_factor.to_string();
 
         let s = self.bucket_id.trim();
@@ -177,10 +171,8 @@ impl GUIConfigStrings {
 
         let s = self.bandwidth_limit.trim();
         let fs = i32::from_str(s);
-        match fs {
-            Ok(n) => {cfg.bandwidth_limit = n.min(1000000)*1000;} // Multiply by 1000 to get B/s from KB/s
-            Err(_) => (),
-        }
+        if let Ok(n) = fs {cfg.bandwidth_limit = n.min(1000000)*1000;} // Multiply by 1000 to get B/s from KB/s
+
         self.bandwidth_limit = (cfg.bandwidth_limit/1000).to_string();
     }
 }
@@ -193,12 +185,10 @@ impl GUIConfig {
             Ok(s) => s,
             Err(_e) => return Self::default(),
         };
-        let cfg = match DeJson::deserialize_json(&json) {
+        match DeJson::deserialize_json(&json) {
             Ok(s) => s,
             Err(_e) => Self::default()
-        };
-
-        cfg
+        }
     }
 }
 
