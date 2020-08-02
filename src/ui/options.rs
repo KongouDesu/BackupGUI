@@ -232,6 +232,7 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     None
 }
 
+// TODO Handle paste
 pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, mods: &ModifiersState) {
     match key {
         // Backspace key

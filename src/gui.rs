@@ -382,6 +382,10 @@ impl GuiProgram {
 
         let cfg = GUIConfig::from_file("config.cfg");
         let strings = GUIConfigStrings::from_cfg(&cfg);
+        let start_state = match cfg.consented {
+            true => UIState::Main,
+            false => UIState::Consent,
+        };
         let mut this = GuiProgram {
             vs_module,
             fs_module,
@@ -397,7 +401,7 @@ impl GuiProgram {
                 strings,
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
-                state: UIState::Main,
+                state: start_state,
                 upload_state: Default::default(),
                 is_purge_done: Arc::new(Mutex::new(false)),
                 cx: 0.0,
@@ -486,6 +490,7 @@ impl GuiProgram {
                         UIState::Main => ui::mainmenu::handle_click(self),
                         UIState::Upload => ui::upload::handle_click(self),
                         UIState::Options => ui::options::handle_click(self),
+                        UIState::Consent => ui::consent::handle_click(self),
                         _ => None,
                     };
                     if state.is_some() {
@@ -544,6 +549,7 @@ impl GuiProgram {
             UIState::Upload => crate::ui::upload::render(self, frame, device),
             UIState::Purge => crate::ui::purge::render(self, frame, device),
             UIState::Options => crate::ui::options::render(self, frame, device),
+            UIState::Consent => crate::ui::consent::render(self, frame, device),
             _ => vec![],
         }
 

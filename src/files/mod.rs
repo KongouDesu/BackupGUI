@@ -7,7 +7,6 @@
 use std::path::{Path, PathBuf};
 
 use std::fs;
-use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::Write;

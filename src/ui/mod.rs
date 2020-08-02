@@ -22,6 +22,7 @@ pub mod align;
 pub mod upload;
 pub mod purge;
 pub mod options;
+pub mod consent;
 
 /// Keeps track of the UI state
 pub struct StateManager {

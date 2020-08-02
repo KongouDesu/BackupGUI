@@ -155,7 +155,14 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
     let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
 
     // Bandwidth per thread
-    let bandwidth = ((bw as usize)/8).max(1);
+    // 0 = unlimited, otherwise we need at least 1 for each thread
+    let bandwidth;
+    if bw > 0 {
+        bandwidth = ((bw as usize)/8).max(1);
+    } else {
+        bandwidth = 0;
+    }
+
 
     // Init backup and authenticate
     let client = reqwest::blocking::Client::builder().timeout(None).build().unwrap();
@@ -266,14 +273,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                             inst.sender.clone()
                         };
 
-                        // Note that 'TrackedReader' has to be _after_ 'HashAtEnd' or it would read 40 bytes extra from the hash!
-                        let file =
-                            raze::util::ReadThrottled::wrap(
-                                raze::util::ReadHashAtEnd::wrap(
-                                    TrackedReader::wrap(file, tx),
-                                ),
-                                bandwidth
-                            );
+
 
                         let params = raze::api::FileParameters {
                             file_path: &path_str,
@@ -282,7 +282,23 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                             content_sha1: Sha1Variant::HexAtEnd,
                             last_modified_millis: modified_time
                         };
-                        let result = raze::api::b2_upload_file(&client, &upauth, file, params);
+                        // Note that 'TrackedReader' has to be _after_ 'HashAtEnd' or it would read 40 bytes extra from the hash!
+                        // If bandwidth == 0, do not throttle
+                        let result = if bandwidth > 0 {
+                            let file = raze::util::ReadThrottled::wrap(
+                                raze::util::ReadHashAtEnd::wrap(
+                                    TrackedReader::wrap(file, tx),
+                                ),
+                                bandwidth
+                            );
+                            raze::api::b2_upload_file(&client, &upauth, file, params)
+                        } else {
+                            let file = raze::util::ReadHashAtEnd::wrap(
+                                TrackedReader::wrap(file, tx),
+                            );
+                            raze::api::b2_upload_file(&client, &upauth, file, params)
+                        };
+
                         match result {
                             Ok(_) => break,
                             Err(e) => {
