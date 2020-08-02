@@ -13,12 +13,15 @@ use std::path::{Path, PathBuf};
 use std::io::{BufRead, Write, Read};
 use std::sync::{Mutex, Arc};
 use nanoserde::{DeJson, SerJson};
+use std::str::FromStr;
+use std::sync::atomic::AtomicBool;
 
 pub mod filetree;
 pub mod mainmenu;
 pub mod align;
 pub mod upload;
 pub mod purge;
+pub mod options;
 
 /// Keeps track of the UI state
 pub struct StateManager {
@@ -28,7 +31,8 @@ pub struct StateManager {
     // See the files module for further explanation
     pub fileroot: DirEntry,
     // Config, i.e. font size and other persistent info
-    pub config: UIConfig,
+    pub config: GUIConfig,
+    pub strings: GUIConfigStrings,
     // Text handler to draw text
     pub text_handler: Mutex<TextHandler>,
     // How far down the list we've scrolled
@@ -36,6 +40,8 @@ pub struct StateManager {
     // Which state we're in (and thus, what should be shown/reacted to)
     pub state: UIState,
     pub upload_state: UploadState,
+
+    pub is_purge_done: Arc<Mutex<bool>>,
 
     // Cursor x and y
     pub cx: f32,
@@ -111,34 +117,100 @@ pub enum UIState {
 
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
 #[derive(Debug,DeJson,SerJson)]
-pub struct UIConfig {
+pub struct GUIConfig {
     // Size of the font (in pixels)
-    // Note that the size of an element is determined from this
+    // Note that the size of an element is determined by this
     pub font_size: f32,
+    // How fast we scroll in the file-tree
     pub scroll_factor: u8,
+    // Bucket used for backups
     pub bucket_id: String,
+    // Bandwidth limit (bytes/s)
+    pub bandwidth_limit: i32,
+    // Whether or not to show file paths while uploading
+    pub hide_file_names: bool,
+    // Whether or not the user has marked that they understand the consequences of using the program
+    pub consented: bool,
 }
 
-impl UIConfig {
+/// Used by the options menu to hold user input
+#[derive(Debug)]
+pub struct GUIConfigStrings {
+    pub active_field: usize,
+    pub font_size: String,
+    pub scroll_factor: String,
+    pub bucket_id: String,
+    pub bandwidth_limit: String,
+}
+
+impl GUIConfigStrings {
+    pub fn from_cfg(cfg: &GUIConfig) -> Self {
+        Self {
+            active_field: 0,
+            font_size: cfg.font_size.to_string(),
+            scroll_factor: cfg.scroll_factor.to_string(),
+            bucket_id: cfg.bucket_id.to_string(),
+            bandwidth_limit: (cfg.bandwidth_limit/1000).to_string(), // Divide by 1000 to get KB/s from B/s
+        }
+    }
+
+    // Verifies input strings and updates the supplied config
+    pub fn destring(&mut self, cfg: &mut GUIConfig) {
+        let s = self.font_size.trim();
+        let fs = f32::from_str(s);
+        match fs {
+            Ok(n) => {cfg.font_size = n.max(4.0).min(1024.0);}
+            Err(_) => (),
+        }
+        self.font_size = cfg.font_size.to_string();
+
+        let s = self.scroll_factor.trim();
+        let fs = u32::from_str(s);
+        match fs {
+            Ok(n) => {cfg.scroll_factor = n.max(1).min(128) as u8;}
+            Err(_) => (),
+        }
+        self.scroll_factor = cfg.scroll_factor.to_string();
+
+        let s = self.bucket_id.trim();
+        cfg.bucket_id = s.to_string();
+
+        let s = self.bandwidth_limit.trim();
+        let fs = i32::from_str(s);
+        match fs {
+            Ok(n) => {cfg.bandwidth_limit = n.min(1000000)*1000;} // Multiply by 1000 to get B/s from KB/s
+            Err(_) => (),
+        }
+        self.bandwidth_limit = (cfg.bandwidth_limit/1000).to_string();
+    }
+}
+
+
+impl GUIConfig {
     /// Instance a UIConfig from the given file, or a default if no such file exists
     pub fn from_file<T: AsRef<str>>(path: T) -> Self {
         let mut json = match std::fs::read_to_string(path.as_ref()) {
             Ok(s) => s,
             Err(_e) => return Self::default(),
         };
-        match DeJson::deserialize_json(&json) {
+        let mut cfg = match DeJson::deserialize_json(&json) {
             Ok(s) => s,
             Err(_e) => Self::default()
-        }
+        };
+
+        cfg
     }
 }
 
-impl Default for UIConfig {
+impl Default for GUIConfig {
     fn default() -> Self {
-        UIConfig {
+        GUIConfig {
             font_size: 24.0,
             scroll_factor: 1,
             bucket_id: "".to_string(),
+            bandwidth_limit: 0,
+            hide_file_names: false,
+            consented: false,
         }
     }
 }

@@ -25,4 +25,4 @@ reqwest = "*"
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.8"}
 
-raze = { path = "C:/Users/Kongou/GitProjects/raze" }
+raze = "0.2.0"

@@ -145,18 +145,17 @@ pub fn start(gui: &mut GuiProgram) {
     let q = gui.state_manager.upload_state.queue.clone();
     let i = gui.state_manager.upload_state.instances.clone();
     let bid = gui.state_manager.config.bucket_id.clone();
-    std::thread::spawn(move || start_upload_threads(q, i, &bid));
+    let bw = gui.state_manager.config.bandwidth_limit.clone();
+    std::thread::spawn(move || start_upload_threads(q, i, &bid, bw));
 }
 
-fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str) {
+fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32) {
     println!("Starting upload, getting file info on stored files");
     // TODO(?) don't hardcode thread count as 8
     let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
-    // TODO Bandwidth should be read from a config
-    const BANDWIDTH: usize = 1*500*1000; // bytes/s upload cap (total for all threads)
 
     // Bandwidth per thread
-    let bandwidth = (BANDWIDTH/8).max(1);
+    let bandwidth = ((bw as usize)/8).max(1);
 
     // Init backup and authenticate
     let client = reqwest::blocking::Client::builder().timeout(None).build().unwrap();
@@ -167,7 +166,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
     // Get all files stored on the server
     // We need this to get the 'last changed' metatdata, which we use to determine
     // if the file has changed and needs to be re-uploaded
-    let mut stored_file_list = Arc::new(raze::util::list_all_files(&client, &auth, bucket_id, 1000).unwrap().files);
+    let mut stored_file_list = Arc::new(raze::util::list_all_files(&client, &auth, bucket_id, 1000).unwrap());
     // Sort so we can binary search later
     Arc::get_mut(&mut stored_file_list).unwrap().sort();
     println!("Got {} files from remote", stored_file_list.len());
@@ -215,7 +214,13 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                     };
                     // Compare modified time
                     let do_upload: bool;
-                    let metadata = std::fs::metadata(&path).unwrap();
+                    let metadata = match std::fs::metadata(&path) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            println!("Failed to get metadata, skipping file ({:?})", e);
+                            continue;
+                        }
+                    };
                     let modified_time = match metadata.modified().unwrap().duration_since(std::time::UNIX_EPOCH) {
                         Ok(v) => v.as_secs() * 1000, // Convert seconds to milliseconds
                         Err(_e) => 0u64
@@ -236,7 +241,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                         }
                     }
                     if !do_upload {
-                        println!("Skipping {:?}", path_str);
+                        //println!("Skipping {:?}", path_str);
                         continue;
                     }
                     println!("Uploading {:?}", path_str);

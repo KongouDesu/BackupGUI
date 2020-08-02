@@ -158,6 +158,7 @@ fn start(
                     ..
                 }
                 | WindowEvent::CloseRequested => {
+                    program.exit();
                     *control_flow = ControlFlow::Exit;
                 }
                 _ => {

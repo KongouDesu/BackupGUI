@@ -350,7 +350,9 @@ impl DirEntry {
                 }
             }
         }
-        queue.lock().unwrap().append(&mut buffer);
+        {
+            queue.lock().unwrap().append(&mut buffer);
+        }
     }
 }
 
@@ -389,6 +391,8 @@ fn get_files_all<T: AsRef<Path>>(path: T, queue: &Arc<Mutex<Vec<PathBuf>>>) {
             }
         }
         // Append collected files to queue
-        queue.lock().unwrap().append(&mut buffer);
+        {
+            queue.lock().unwrap().append(&mut buffer);
+        }
     }
 }

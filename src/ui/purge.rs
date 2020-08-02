@@ -15,6 +15,7 @@ use crate::gui::{GuiProgram, Vertex};
 use crate::gui::TexVertex;
 use crate::ui::{UIState, UploadInstance};
 use crate::ui::align::Anchor;
+use std::sync::atomic::AtomicBool;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -99,23 +100,22 @@ pub fn handle_click(gui: &GuiProgram) -> Option<UIState> {
 // Start the purge thread to run in the background
 pub fn start_purge_thread(gui: &mut GuiProgram) {
     println!("Start purge");
+    *gui.state_manager.is_purge_done.lock().unwrap() = false;
 
     let mut q = gui.state_manager.upload_state.queue.clone();
     let f = gui.state_manager.fileroot.get_files_for_upload(&q);
     let bid = gui.state_manager.config.bucket_id.clone();
+    let done = gui.state_manager.is_purge_done.clone();
 
-    std::thread::spawn(move || purge_task(q, bid));
+    std::thread::spawn(move || purge_task(q, bid, done));
 }
 
-fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String) {
+fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) {
     // Collect all files that are supposed to be uploaded
-
-
     let local_files = q.lock().unwrap();
     let mut local_files: Vec<String> = local_files.iter().map(|x| x.to_string_lossy().replace("\\", "/")).collect();
     local_files.sort();
     println!("Collected local files");
-    println!("{:?}", local_files);
 
     // Get list of files on server
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs_f32(30.0)).build().unwrap();
@@ -124,7 +124,7 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String) {
 
     // Avoid crashing the program if it fails
     let mut remote_files = match raze::util::list_all_files(&client, &auth, &bid, 1000) {
-        Ok(f) => f.files,
+        Ok(f) => f,
         Err(e) => {
             println!("Failed to get remote files - {:?}", e);
             return
@@ -132,7 +132,6 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String) {
     };
     println!("Collected remote files");
     let n: Vec<String> = remote_files.iter().map(|x| x.file_name.to_string()).collect();
-    println!("{:?}", n);
 
     // Compare the two lists:
     // Check each file in the cloud; if it isn't in the upload list, queue it for hiding
@@ -182,4 +181,5 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String) {
     });
 
     println!("Done purging");
+    *done.lock().unwrap() = true;
 }

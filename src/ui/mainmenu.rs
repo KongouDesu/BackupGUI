@@ -87,10 +87,8 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
         println!("Swapping state to Upload");
         Some(UIState::Upload)
     } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 196.0, 100.0, 196.0, 148.0) {
-        println!("Swapping state to Options (Temporarily replaced by purge)");
-        //Some(UIState::Options)
-        crate::ui::purge::start_purge_thread(gui);
-        Some(UIState::Purge)
+        println!("Swapping state to Options");
+        Some(UIState::Options)
     } else {
         None
     }

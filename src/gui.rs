@@ -8,9 +8,11 @@ use crate::ui;
 use crate::ui::align::{Anchor,AlignConfig};
 use crate::files;
 use crate::ui::{UIState, filetree};
-use crate::ui::UIConfig;
-use std::sync::Mutex;
+use crate::ui::{GUIConfig,GUIConfigStrings};
+use std::sync::{Mutex, Arc};
 use std::io::Cursor;
+use nanoserde::SerJson;
+use std::sync::atomic::AtomicBool;
 
 
 #[repr(C)]
@@ -378,6 +380,8 @@ impl GuiProgram {
 
         let vertex_count = 0 as u32;
 
+        let cfg = GUIConfig::from_file("config.cfg");
+        let strings = GUIConfigStrings::from_cfg(&cfg);
         let mut this = GuiProgram {
             vs_module,
             fs_module,
@@ -389,11 +393,13 @@ impl GuiProgram {
             sc_desc: sc_desc.clone(),
             state_manager: ui::StateManager {
                 fileroot: files::get_roots().unwrap(),
-                config: UIConfig::from_file("config.cfg"),
+                config: cfg,
+                strings,
                 text_handler: Mutex::new(text::TextHandler::init(&device, sc_desc.format)),
                 scroll: 0.0,
                 state: UIState::Main,
                 upload_state: Default::default(),
+                is_purge_done: Arc::new(Mutex::new(false)),
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -454,8 +460,8 @@ impl GuiProgram {
         match event {
             winit::event::WindowEvent::KeyboardInput { input, .. } => {
                 if let winit::event::ElementState::Pressed = input.state {
-                    match input.virtual_keycode {
-                        _ => {}
+                    if input.virtual_keycode.is_some() {
+                        ui::options::handle_keypress(self, &input.virtual_keycode.unwrap(), &input.modifiers)
                     }
                 }
             },
@@ -479,6 +485,7 @@ impl GuiProgram {
                         UIState::FileTree => ui::filetree::handle_click(self, but),
                         UIState::Main => ui::mainmenu::handle_click(self),
                         UIState::Upload => ui::upload::handle_click(self),
+                        UIState::Options => ui::options::handle_click(self),
                         _ => None,
                     };
                     if state.is_some() {
@@ -516,12 +523,36 @@ impl GuiProgram {
             self.rebuild_pipeline = false;
         }
 
+        //// Check if we should swap state
+        let next = match &self.state_manager.state {
+            UIState::Purge => {
+                if *self.state_manager.is_purge_done.lock().unwrap() == true {
+                    Some(UIState::Main)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if next.is_some() {
+            self.state_manager.state = next.unwrap();
+        }
+
         match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
             UIState::Main => crate::ui::mainmenu::render(self, frame, device),
             UIState::Upload => crate::ui::upload::render(self, frame, device),
             UIState::Purge => crate::ui::purge::render(self, frame, device),
+            UIState::Options => crate::ui::options::render(self, frame, device),
             _ => vec![],
         }
+
+    }
+
+    // Saves the config when exiting
+    pub fn exit(&mut self) {
+        self.state_manager.strings.destring(&mut self.state_manager.config);
+        let json = SerJson::serialize_json(&self.state_manager.config);
+        std::fs::write("config.cfg",json);
     }
 }
