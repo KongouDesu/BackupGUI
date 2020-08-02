@@ -1,7 +1,7 @@
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
+
 use crate::gui::GuiProgram;
-use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
-use zerocopy::{AsBytes, FromBytes};
-use crate::gui::TexVertex;
 use crate::ui::align::Anchor;
 use crate::ui::UIState;
 

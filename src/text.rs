@@ -11,7 +11,7 @@ impl TextHandler {
         let font = ab_glyph::FontArc::try_from_slice(include_bytes!("../Caladea-Regular.ttf"))
             .expect("Load font");
 
-        let mut glyph_brush = GlyphBrushBuilder::using_font(font)
+        let glyph_brush = GlyphBrushBuilder::using_font(font)
             .build(&device, render_format);
         TextHandler {
             glyph_brush

@@ -237,13 +237,6 @@ impl DirEntry {
         *self.expanded.lock().unwrap() = true;
     }
 
-    /// Forcibly refresh the children of some entry
-    pub fn refresh_children(&self) {
-        *self.children.lock().unwrap() = vec![];
-        *self.indexed.lock().unwrap() = false;
-        self.expand();
-    }
-
     /// Changes the action of an element
     /// Applies recursively to all children unless they are marked 'Ignore' and the new action is 'Upload'
     pub fn change_action(&self, new_action: Action) {
@@ -284,7 +277,7 @@ impl DirEntry {
         let x = path.find('/');
         let name;
         let remainder;
-        let x = match x {
+        match x {
             Some(n)=> {
                 name = &path[0..n];
                 remainder = &path[n+1..];
@@ -385,7 +378,6 @@ fn get_files_all<T: AsRef<Path>>(path: T, queue: &Arc<Mutex<Vec<PathBuf>>>) {
             if !is_dir {
                 buffer.push(entry.path().to_owned());
             } else {
-                let path = entry.path().to_string_lossy().to_string();
                 get_files_all(entry.path(), queue);
             }
         }

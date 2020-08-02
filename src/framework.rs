@@ -1,9 +1,10 @@
-use futures::task::LocalSpawn;
 use std::time::{Duration, Instant};
+
 use winit::{
     event::{self, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
+
 use crate::gui::GuiProgram;
 
 #[allow(dead_code)]
@@ -29,7 +30,6 @@ struct Setup {
     event_loop: EventLoop<()>,
     size: winit::dpi::PhysicalSize<u32>,
     surface: wgpu::Surface,
-    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
@@ -59,7 +59,6 @@ async fn setup(title: &str) -> Setup {
         .await
         .unwrap();
 
-    let trace_dir = std::env::var("WGPU_TRACE");
     let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
         extensions: wgpu::Extensions {
             anisotropic_filtering: false,
@@ -73,7 +72,6 @@ async fn setup(title: &str) -> Setup {
         event_loop,
         size,
         surface,
-        adapter,
         device,
         queue,
     }
@@ -85,12 +83,11 @@ fn start(
         event_loop,
         size,
         surface,
-        adapter,
         device,
         queue,
     }: Setup,
 ) {
-    let (mut pool, spawner) = {
+    let (mut pool, _spawner) = {
         env_logger::init();
 
         let local_pool = futures::executor::LocalPool::new();

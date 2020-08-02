@@ -1,8 +1,9 @@
-use crate::gui::{GuiProgram, Vertex};
-use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage};
-use zerocopy::{AsBytes, FromBytes};
-use crate::ui::align::Anchor;
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
+
 use crate::files::{Action, DirEntry};
+use crate::gui::{GuiProgram, Vertex};
+use crate::ui::align::Anchor;
 use crate::ui::UIState;
 
 pub fn render(
@@ -48,7 +49,7 @@ pub fn render(
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
     //let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
-    let mut vertices = gui.align.image(Anchor::TopRight, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,588.0,128.0,64.0]));
+    let vertices = gui.align.image(Anchor::TopRight, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,588.0,128.0,64.0]));
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
     let rpass_color_attachment =  {
@@ -115,7 +116,7 @@ pub fn render(
 // Returns a vec of vertices representing what it wants to draw
 fn render_file_tree(gui: &crate::GuiProgram) -> Vec<Vertex> {
     let mut y = gui.state_manager.scroll + 32.0*gui.align.scale;
-    let mut indent = 0f32;
+    let indent = 0f32;
     let mut vertices: Vec<Vertex> = Vec::new();
 
     // Render background, note that font_size determines height

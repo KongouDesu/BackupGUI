@@ -3,19 +3,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use raze;
-use raze::api::Sha1Variant;
 use reqwest;
 use scoped_pool::Pool;
-use wgpu::{BufferDescriptor, BufferUsage, vertex_attr_array};
-use zerocopy::{AsBytes, FromBytes};
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
 
-use crate::files::{Action, DirEntry, EntryKind};
-use crate::files::tracked_reader::TrackedReader;
-use crate::gui::{GuiProgram, Vertex};
-use crate::gui::TexVertex;
-use crate::ui::{UIState, UploadInstance};
+use crate::gui::GuiProgram;
 use crate::ui::align::Anchor;
-use std::sync::atomic::AtomicBool;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -28,7 +22,7 @@ pub fn render(
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
     //let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
-    let mut vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 0.0, 256.0, 256.0, gui.timer, Some([0.0,0.0,256.0,256.0]));
+    let vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 0.0, 256.0, 256.0, gui.timer, Some([0.0,0.0,256.0,256.0]));
 
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
@@ -92,18 +86,13 @@ pub fn render(
     vec![cb1,cb2]
 }
 
-pub fn handle_click(gui: &GuiProgram) -> Option<UIState> {
-    None
-}
-
-
 // Start the purge thread to run in the background
 pub fn start_purge_thread(gui: &mut GuiProgram) {
     println!("Start purge");
     *gui.state_manager.is_purge_done.lock().unwrap() = false;
 
-    let mut q = gui.state_manager.upload_state.queue.clone();
-    let f = gui.state_manager.fileroot.get_files_for_upload(&q);
+    let q = gui.state_manager.upload_state.queue.clone();
+    gui.state_manager.fileroot.get_files_for_upload(&q);
     let bid = gui.state_manager.config.bucket_id.clone();
     let done = gui.state_manager.is_purge_done.clone();
 
@@ -123,7 +112,7 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) 
     let auth = raze::util::authenticate_from_file(&client,"credentials").unwrap();
 
     // Avoid crashing the program if it fails
-    let mut remote_files = match raze::util::list_all_files(&client, &auth, &bid, 1000) {
+    let remote_files = match raze::util::list_all_files(&client, &auth, &bid, 1000) {
         Ok(f) => f,
         Err(e) => {
             println!("Failed to get remote files - {:?}", e);
@@ -131,7 +120,6 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) 
         },
     };
     println!("Collected remote files");
-    let n: Vec<String> = remote_files.iter().map(|x| x.file_name.to_string()).collect();
 
     // Compare the two lists:
     // Check each file in the cloud; if it isn't in the upload list, queue it for hiding
@@ -149,7 +137,7 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) 
     let pool = Pool::new(16);
     // Spawn hide threads
     pool.scoped(|scope| {
-        for i in 0..pool.workers() {
+        for _i in 0..pool.workers() {
             let hl = hide_list.clone();
             let bid = bid.clone();
             let client = &client;
@@ -165,7 +153,7 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) 
                     };
 
                     println!("Hiding {:?}", file);
-                    for i in 0..5 {
+                    for _i in 0..5 {
                         let res = raze::api::b2_hide_file(&client, &auth, &bid, &file);
                         match res {
                             Ok(_) => break, // Break on success = do not retry

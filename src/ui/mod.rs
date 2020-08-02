@@ -1,20 +1,19 @@
+use std::io::BufRead;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+
+use nanoserde::{DeJson, SerJson};
+
 /// This module contains the logic for
 /// 1. Keeping track of the UI state, e.g. scrolling
 /// 2. Code for rendering the file-tree
 /// 3. Logic for handling mouse clicks
 /// 4. (De)serialize code
 
-use crate::files::{DirEntry, Action};
+use crate::files::{Action, DirEntry};
+use crate::gui::Vertex;
 use crate::text::TextHandler;
-use crate::gui::{Vertex, GuiProgram};
-use crate::ui::align::{AlignConfig, Anchor};
-
-use std::path::{Path, PathBuf};
-use std::io::{BufRead, Write, Read};
-use std::sync::{Mutex, Arc};
-use nanoserde::{DeJson, SerJson};
-use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
 
 pub mod filetree;
 pub mod mainmenu;
@@ -190,11 +189,11 @@ impl GUIConfigStrings {
 impl GUIConfig {
     /// Instance a UIConfig from the given file, or a default if no such file exists
     pub fn from_file<T: AsRef<str>>(path: T) -> Self {
-        let mut json = match std::fs::read_to_string(path.as_ref()) {
+        let json = match std::fs::read_to_string(path.as_ref()) {
             Ok(s) => s,
             Err(_e) => return Self::default(),
         };
-        let mut cfg = match DeJson::deserialize_json(&json) {
+        let cfg = match DeJson::deserialize_json(&json) {
             Ok(s) => s,
             Err(_e) => Self::default()
         };
@@ -259,8 +258,8 @@ impl StateManager {
     /// Counterpart to serialize
     pub fn deserialize<T: AsRef<Path>>(&mut self, file: T) {
         let path = file.as_ref();
-        let mut file = std::fs::File::open(path).unwrap();
-        let mut reader = std::io::BufReader::new(file);
+        let file = std::fs::File::open(path).unwrap();
+        let reader = std::io::BufReader::new(file);
         for line in reader.lines() {
             if line.is_err() {
                 println!("Malformed entry - {}", line.err().unwrap());

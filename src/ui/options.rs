@@ -1,19 +1,8 @@
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
 
-use raze;
-use raze::api::Sha1Variant;
-use reqwest;
-use scoped_pool::Pool;
-use wgpu::{BufferDescriptor, BufferUsage, vertex_attr_array};
-use zerocopy::{AsBytes, FromBytes};
-
-use crate::files::{Action, DirEntry, EntryKind};
-use crate::files::tracked_reader::TrackedReader;
 use crate::gui::{GuiProgram, Vertex};
-use crate::gui::TexVertex;
-use crate::ui::{UIState, UploadInstance};
+use crate::ui::UIState;
 use crate::ui::align::Anchor;
 use winit::event::{VirtualKeyCode, ModifiersState};
 
@@ -233,7 +222,7 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
 }
 
 // TODO Handle paste
-pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, mods: &ModifiersState) {
+pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, _mods: &ModifiersState) {
     match key {
         // Backspace key
         VirtualKeyCode::Back => {

@@ -1,21 +1,9 @@
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
 
-use raze;
-use raze::api::Sha1Variant;
-use reqwest;
-use scoped_pool::Pool;
-use wgpu::{BufferDescriptor, BufferUsage, vertex_attr_array};
-use zerocopy::{AsBytes, FromBytes};
-
-use crate::files::{Action, DirEntry, EntryKind};
-use crate::files::tracked_reader::TrackedReader;
 use crate::gui::{GuiProgram, Vertex};
-use crate::gui::TexVertex;
-use crate::ui::{UIState, UploadInstance};
 use crate::ui::align::Anchor;
-use winit::event::{VirtualKeyCode, ModifiersState};
+use crate::ui::UIState;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -24,7 +12,7 @@ pub fn render(
 ) -> Vec<wgpu::CommandBuffer> {
 
     ///// Polygons
-    let mut vertices = &mut Vertex::rect(gui.align.win_width/2.0 - 300.0, gui.align.win_height/2.0 - 300.0, 600.0, 600.0, [0.7,0.7,0.7,1.0]);
+    let vertices = &mut Vertex::rect(gui.align.win_width/2.0 - 300.0, gui.align.win_height/2.0 - 300.0, 600.0, 600.0, [0.7,0.7,0.7,1.0]);
 
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -124,7 +112,7 @@ pub fn render(
     ///// Images
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    let mut vertices;
+    let vertices;
     if gui.timer < 10.0 {
         vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 250.0, 200.0, 62.0, 0.0, Some([0.0,781.0,200.0,62.0]));
     } else {

@@ -1,19 +1,18 @@
-use crate::framework;
-use zerocopy::{AsBytes, FromBytes};
-use wgpu::{vertex_attr_array, BufferDescriptor, BufferUsage, Texture, TextureView};
-use image;
+use std::io::Cursor;
+use std::sync::{Arc, Mutex};
 
+use image;
+use nanoserde::SerJson;
+use wgpu::vertex_attr_array;
+use zerocopy::{AsBytes, FromBytes};
+
+use crate::files;
+use crate::framework;
 use crate::text;
 use crate::ui;
-use crate::ui::align::{Anchor,AlignConfig};
-use crate::files;
-use crate::ui::{UIState, filetree};
-use crate::ui::{GUIConfig,GUIConfigStrings};
-use std::sync::{Mutex, Arc};
-use std::io::Cursor;
-use nanoserde::SerJson;
-use std::sync::atomic::AtomicBool;
-
+use crate::ui::{filetree, UIState};
+use crate::ui::{GUIConfig, GUIConfigStrings};
+use crate::ui::align::AlignConfig;
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
@@ -378,8 +377,6 @@ impl GuiProgram {
             &pipeline_layout,
         );
 
-        let vertex_count = 0 as u32;
-
         let cfg = GUIConfig::from_file("config.cfg");
         let strings = GUIConfigStrings::from_cfg(&cfg);
         let start_state = match cfg.consented {
@@ -477,7 +474,7 @@ impl GuiProgram {
 
                 self.state_manager.scroll(y, self.align.scale, max);
             },
-            winit::event::WindowEvent::MouseInput {device_id, state, button, modifiers} => {
+            winit::event::WindowEvent::MouseInput {device_id: _, state, button, modifiers: _} => {
                 if state == winit::event::ElementState::Pressed  {
                     let but = match button {
                         winit::event::MouseButton::Left => 1,
@@ -488,7 +485,6 @@ impl GuiProgram {
                     let state = match self.state_manager.state {
                         UIState::FileTree => ui::filetree::handle_click(self, but),
                         UIState::Main => ui::mainmenu::handle_click(self),
-                        UIState::Upload => ui::upload::handle_click(self),
                         UIState::Options => ui::options::handle_click(self),
                         UIState::Consent => ui::consent::handle_click(self),
                         _ => None,
@@ -505,7 +501,7 @@ impl GuiProgram {
                     }
                 }
             },
-            winit::event::WindowEvent::CursorMoved {device_id, position, modifiers} => {
+            winit::event::WindowEvent::CursorMoved {device_id: _, position, modifiers: _} => {
                 self.state_manager.cursor_moved(position.x as f32, position.y as f32);
             }
             _ => {}
@@ -550,7 +546,6 @@ impl GuiProgram {
             UIState::Purge => crate::ui::purge::render(self, frame, device),
             UIState::Options => crate::ui::options::render(self, frame, device),
             UIState::Consent => crate::ui::consent::render(self, frame, device),
-            _ => vec![],
         }
 
     }
@@ -559,6 +554,6 @@ impl GuiProgram {
     pub fn exit(&mut self) {
         self.state_manager.strings.destring(&mut self.state_manager.config);
         let json = SerJson::serialize_json(&self.state_manager.config);
-        std::fs::write("config.cfg",json);
+        std::fs::write("config.cfg",json).unwrap();
     }
 }

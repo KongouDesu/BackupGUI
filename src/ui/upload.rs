@@ -6,15 +6,12 @@ use raze;
 use raze::api::Sha1Variant;
 use reqwest;
 use scoped_pool::Pool;
-use wgpu::{BufferDescriptor, BufferUsage, vertex_attr_array};
-use zerocopy::{AsBytes, FromBytes};
+use wgpu::BufferUsage;
+use zerocopy::AsBytes;
 
-use crate::files::{Action, DirEntry, EntryKind};
 use crate::files::tracked_reader::TrackedReader;
 use crate::gui::{GuiProgram, Vertex};
-use crate::gui::TexVertex;
-use crate::ui::{UIState, UploadInstance};
-use crate::ui::align::Anchor;
+use crate::ui::UploadInstance;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -54,7 +51,7 @@ pub fn render(
     const BAR_WIDTH: f32 = 700.0;
     const BAR_HEIGHT: f32 = 40.0;
     const BAR_SPACING: f32 = 8.0;
-    let bar_start_y = ((gui.sc_desc.height as f32)/2.0 - (4.0 * (BAR_HEIGHT + BAR_SPACING)) + ((BAR_HEIGHT+BAR_SPACING)/2.0));
+    let bar_start_y = (gui.sc_desc.height as f32)/2.0 - (4.0 * (BAR_HEIGHT + BAR_SPACING)) + ((BAR_HEIGHT+BAR_SPACING)/2.0);
     for i in 0..8 {
         // Back bar
         vertices.append(&mut super::Vertex::rect((gui.sc_desc.width as f32)/2.0-BAR_WIDTH/2.0,bar_start_y+(BAR_SPACING+BAR_HEIGHT)*i as f32,
@@ -64,7 +61,7 @@ pub fn render(
         while let Ok(amount) = instance_vec[i].receiver.try_recv() {
             instance_vec[i].progress += amount;
         }
-        let width = ((BAR_WIDTH-2.0)*instance_vec[i].progress as f32/instance_vec[i].size as f32);
+        let width = (BAR_WIDTH-2.0)*instance_vec[i].progress as f32/instance_vec[i].size as f32;
         vertices.append(&mut super::Vertex::rect((gui.sc_desc.width as f32)/2.0-BAR_WIDTH/2.0 + 1.0,bar_start_y+(BAR_SPACING+BAR_HEIGHT)*i as f32 + 1.0,
                                                  width, BAR_HEIGHT - 2.0, [0.1,0.3,0.1,1.0]));
 
@@ -118,11 +115,6 @@ pub fn render(
 
     vec![cb3,cb2]
 }
-
-pub fn handle_click(gui: &GuiProgram) -> Option<UIState> {
-    None
-}
-
 
 // Start uploading files
 pub fn start(gui: &mut GuiProgram) {
@@ -232,7 +224,7 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                         Ok(v) => v.as_secs() * 1000, // Convert seconds to milliseconds
                         Err(_e) => 0u64
                     };
-                    let mut filesize = metadata.len(); // Used later as well
+                    let filesize = metadata.len(); // Used later as well
 
                     match sfl.binary_search(&sf) {
                         Ok(v) => { // A file with the same path+name exists
