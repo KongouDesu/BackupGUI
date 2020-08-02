@@ -12,6 +12,7 @@ use crate::ui;
 use crate::ui::{filetree, UIState};
 use crate::ui::{GUIConfig, GUIConfigStrings};
 use crate::ui::align::AlignConfig;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
@@ -241,7 +242,6 @@ impl GuiProgram {
         let (width, height) = img.dimensions();
         println!("{}x{}", width, height);
         let img = img.into_raw();
-        println!("Bytes: {}", img.len());
 
         let texels = img;
         let texture_extent = wgpu::Extent3d {
@@ -399,7 +399,7 @@ impl GuiProgram {
                 scroll: 0.0,
                 state: start_state,
                 upload_state: Default::default(),
-                is_purge_done: Arc::new(Mutex::new(false)),
+                is_purge_done: Arc::new(AtomicBool::new(false)),
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -520,7 +520,7 @@ impl GuiProgram {
         //// Check if we should swap state
         let next = match &self.state_manager.state {
             UIState::Purge => {
-                if *self.state_manager.is_purge_done.lock().unwrap() {
+                if self.state_manager.is_purge_done.load(Ordering::Relaxed) {
                     Some(UIState::Main)
                 } else {
                     None

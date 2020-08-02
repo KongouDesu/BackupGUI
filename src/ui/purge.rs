@@ -8,6 +8,7 @@ use zerocopy::AsBytes;
 
 use crate::gui::GuiProgram;
 use crate::ui::align::Anchor;
+use std::sync::atomic::{Ordering, AtomicBool};
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -87,7 +88,7 @@ pub fn render(
 // Start the purge thread to run in the background
 pub fn start_purge_thread(gui: &mut GuiProgram) {
     println!("Start purge");
-    *gui.state_manager.is_purge_done.lock().unwrap() = false;
+    gui.state_manager.is_purge_done.swap(false, Ordering::Relaxed);
 
     let q = gui.state_manager.upload_state.queue.clone();
     gui.state_manager.fileroot.get_files_for_upload(&q);
@@ -97,7 +98,7 @@ pub fn start_purge_thread(gui: &mut GuiProgram) {
     std::thread::spawn(move || purge_task(q, bid, done));
 }
 
-fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) {
+fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>) {
     // Collect all files that are supposed to be uploaded
     let local_files = q.lock().unwrap();
     let mut local_files: Vec<String> = local_files.iter().map(|x| x.to_string_lossy().replace("\\", "/")).collect();
@@ -167,5 +168,5 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<Mutex<bool>>) 
     });
 
     println!("Done purging");
-    *done.lock().unwrap() = true;
+    done.swap(true, Ordering::Relaxed);
 }

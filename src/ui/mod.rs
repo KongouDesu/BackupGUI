@@ -14,6 +14,7 @@ use nanoserde::{DeJson, SerJson};
 use crate::files::{Action, DirEntry};
 use crate::gui::Vertex;
 use crate::text::TextHandler;
+use std::sync::atomic::AtomicBool;
 
 pub mod filetree;
 pub mod mainmenu;
@@ -41,7 +42,7 @@ pub struct StateManager {
     pub state: UIState,
     pub upload_state: UploadState,
 
-    pub is_purge_done: Arc<Mutex<bool>>,
+    pub is_purge_done: Arc<AtomicBool>,
 
     // Cursor x and y
     pub cx: f32,
@@ -258,11 +259,9 @@ impl StateManager {
             let line = line.unwrap();
             if line.starts_with("UPLOAD ") {
                 // offset 7 for "UPLOAD " (note the space)
-                println!("Trying to expand (upload) - {}" , &line[7..]);
                 self.fileroot.expand_for_path(&line[7..], Action::Upload);
             } else if line.starts_with("EXCLUDE ") {
                 // offset 8 for "EXCLUDE " (note the space)
-                println!("Trying to expand (exclude) - {}" , &line[8..]);
                 self.fileroot.expand_for_path(&line[8..], Action::Exclude);
             } else {
                 println!("Malformed entry - {}", line);

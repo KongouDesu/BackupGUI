@@ -1,5 +1,3 @@
-#![allow(clippy::mutex_atomic)]
-
 mod framework;
 
 mod gui;
@@ -9,11 +7,6 @@ mod text;
 mod ui;
 mod files;
 
-#[allow(dead_code)]
 fn main() {
-    framework::run("Test");
+    framework::run("Backup GUI");
 }
-
-// Examples:
-// https://github.com/gfx-rs/wgpu-rs/blob/v0.5/examples/framework.rs
-// https://github.com/gfx-rs/wgpu-rs/blob/v0.5/Cargo.toml

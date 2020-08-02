@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::cmp::Ordering;
+use std::sync::atomic::AtomicBool;
 
 pub mod tracked_reader;
 
@@ -48,8 +49,8 @@ pub fn get_roots() -> Result<DirEntry,&'static str> {
             path: "".to_string(),
             action: Arc::new(Mutex::new(Action::Exclude)),
             children: Arc::new(Mutex::new(vec![])),
-            indexed: Arc::new(Mutex::new(true)),
-            expanded: Arc::new(Mutex::new(true))
+            indexed: Arc::new(AtomicBool::new(true)),
+            expanded: Arc::new(AtomicBool::new(true))
         };
         // Add found rives to the root element
         for x in drive_string.split('\0').filter(|x| !x.is_empty()) {
@@ -61,8 +62,8 @@ pub fn get_roots() -> Result<DirEntry,&'static str> {
                     path: name.to_owned(),
                     action: Arc::new(Mutex::new(Action::Exclude)),
                     children: Arc::new(Mutex::new(vec![])),
-                    indexed: Arc::new(Mutex::new(false)),
-                    expanded: Arc::new(Mutex::new(false)),
+                    indexed: Arc::new(AtomicBool::new(false)),
+                    expanded: Arc::new(AtomicBool::new(false)),
                 }
             );
         }
@@ -136,9 +137,9 @@ pub struct DirEntry {
     pub action: Arc<Mutex<Action>>,
     pub children: Arc<Mutex<Vec<DirEntry>>>,
     // Whether or not the entry has had it's children vector populated yet
-    pub indexed: Arc<Mutex<bool>>,
+    pub indexed: Arc<AtomicBool>,
     // Whether or not to show children in the tree
-    pub expanded: Arc<Mutex<bool>>,
+    pub expanded: Arc<AtomicBool>,
 }
 
 
@@ -183,9 +184,8 @@ impl DirEntry {
     /// Symlinks are IGNORED to prevent cycles
     /// Sorts elements, see Ord impl for DirEntry
     pub fn expand(&self) {
-        println!("{:?}", self.path);
         // Only index once, see 'refresh_children'
-        if *self.indexed.lock().unwrap() {
+        if self.indexed.load(std::sync::atomic::Ordering::Relaxed) {
             return;
         }
 
@@ -224,9 +224,8 @@ impl DirEntry {
                         path,
                         action: Arc::new(Mutex::new(*self.action.lock().unwrap())),
                         children: Arc::new(Mutex::new(vec![])),
-                        indexed: Arc::new(Mutex::new(false)),
-
-                        expanded: Arc::new(Mutex::new(false)),
+                        indexed: Arc::new(AtomicBool::new(false)),
+                        expanded: Arc::new(AtomicBool::from(false)),
                     }
                 )
             }
@@ -234,8 +233,8 @@ impl DirEntry {
         // Sort the elements, see Ord impl for DirEntry for details
         self.children.lock().unwrap().sort();
 
-        *self.indexed.lock().unwrap() = true;
-        *self.expanded.lock().unwrap() = true;
+        self.indexed.swap(true, std::sync::atomic::Ordering::Relaxed);
+        self.expanded.swap(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Changes the action of an element
@@ -336,7 +335,7 @@ impl DirEntry {
             if entry.kind == EntryKind::File && *entry.action.lock().unwrap() == Action::Upload {
                 buffer.push(PathBuf::from(entry.path.clone()));
             } else if entry.kind == EntryKind::Directory {
-                if *entry.indexed.lock().unwrap() {
+                if entry.indexed.load(std::sync::atomic::Ordering::Relaxed) {
                     entry.get_files(queue);
                 } else if *entry.action.lock().unwrap() == Action::Upload {
                     get_files_all(entry.path.clone(), queue);

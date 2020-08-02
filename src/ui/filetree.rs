@@ -5,6 +5,7 @@ use crate::files::{Action, DirEntry};
 use crate::gui::{GuiProgram, Vertex};
 use crate::ui::align::Anchor;
 use crate::ui::UIState;
+use std::sync::atomic::Ordering;
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -154,7 +155,7 @@ fn render_subtree(gui: &crate::GuiProgram, root: &DirEntry, mut y: f32, mut inde
     y += gui.state_manager.config.font_size*gui.align.scale;
 
     // Render children
-    if *root.expanded.lock().unwrap() {
+    if root.expanded.load(Ordering::Relaxed) {
         indent += 24.0f32*gui.align.scale;
         for entry in root.children.lock().unwrap().iter() {
             let res = render_subtree(gui, entry, y, indent, vertex_buffer);
@@ -179,7 +180,7 @@ fn render_subtree_text(gui: &crate::GuiProgram, root: &DirEntry, mut y: f32, mut
     y += gui.state_manager.config.font_size*gui.align.scale;
 
     // Render children
-    if *root.expanded.lock().unwrap() {
+    if root.expanded.load(Ordering::Relaxed) {
         indent += 24.0f32*gui.align.scale;
         for entry in root.children.lock().unwrap().iter() {
             y = render_subtree_text(gui, entry, y, indent);
@@ -220,14 +221,14 @@ fn handle_click_rec(gui: &GuiProgram, entry: &DirEntry, x: f32, mut y: f32, butt
         println!("Click {:?}, button {:?}", entry.name, button);
         if button == 1 {
             // Toggle visibility
-            if *entry.expanded.lock().unwrap() {
-                *entry.expanded.lock().unwrap() = false;
+            if entry.expanded.load(Ordering::Relaxed) {
+                entry.expanded.swap(false, Ordering::Relaxed);
             } else {
                 // This refreshes the dir and expands it
-                if !*entry.indexed.lock().unwrap() {
+                if !entry.indexed.load(Ordering::Relaxed) {
                     entry.expand();
                 }
-                *entry.expanded.lock().unwrap() = true;
+                entry.expanded.swap(true, Ordering::Relaxed);
             }
         } else if button == 2 {
             // Change action
@@ -245,7 +246,7 @@ fn handle_click_rec(gui: &GuiProgram, entry: &DirEntry, x: f32, mut y: f32, butt
     y -= gui.state_manager.config.font_size*gui.align.scale;
 
     // Notice: Only search expanded (visible) entries, as we cant click invisible ones
-    if *entry.expanded.lock().unwrap() {
+    if entry.expanded.load(Ordering::Relaxed) {
         let mut done;
         for entry in entry.children.lock().unwrap().iter() {
             let temp = handle_click_rec(gui, entry, x, y, button);
@@ -272,7 +273,7 @@ pub fn compute_max_scroll(gui: &GuiProgram) -> f32 {
 // Recursive part of 'compute_max_scroll'
 fn get_height_rec(gui: &GuiProgram, entry: &DirEntry, mut y: f32) -> f32 {
     y += gui.state_manager.config.font_size*gui.align.scale;
-    if *entry.expanded.lock().unwrap() {
+    if entry.expanded.load(Ordering::Relaxed) {
         for entry in entry.children.lock().unwrap().iter() {
             y += get_height_rec(gui, entry, 0.0);
         }
