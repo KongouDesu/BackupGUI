@@ -6,6 +6,10 @@ use crate::ui::UIState;
 use crate::ui::align::Anchor;
 use winit::event::{VirtualKeyCode, ModifiersState};
 
+use clipboard::ClipboardProvider;
+use clipboard::ClipboardContext;
+use std::error::Error;
+
 pub fn render(
     gui: &mut GuiProgram,
     frame: &wgpu::SwapChainOutput,
@@ -14,7 +18,7 @@ pub fn render(
 
     ///// Polygons
     let mut vertices = vec![];
-    for i in 0..5 {
+    for i in 0..7 {
         let col_left = match i % 2 {
             0 => [0.2,0.2,0.2,1.0],
             1 => [0.3,0.3,0.3,1.0],
@@ -30,8 +34,8 @@ pub fn render(
             }
         };
         let i = i as f32;
-        vertices.append(&mut Vertex::rect(gui.align.win_width/2.0 - 300.0, gui.align.win_height/2.0 - 125.0 + 50.0*i, 300.0, 50.0, col_left));
-        vertices.append(&mut Vertex::rect(gui.align.win_width/2.0, gui.align.win_height/2.0 - 125.0 + 50.0*i, 300.0, 50.0, col_right));
+        vertices.append(&mut Vertex::rect(gui.align.win_width/2.0 - 300.0, gui.align.win_height/2.0 - 225.0 + 50.0*i, 300.0, 50.0, col_left));
+        vertices.append(&mut Vertex::rect(gui.align.win_width/2.0, gui.align.win_height/2.0 - 225.0 + 50.0*i, 300.0, 50.0, col_right));
     }
 
 
@@ -92,17 +96,25 @@ pub fn render(
                                                                  96.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     // Draw options
-    th.draw_centered("Font size", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 100.0 ,
+    th.draw_centered("Font size", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 200.0 ,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&gui.state_manager.strings.font_size,
-                                                                 gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 100.0,
+    th.draw_centered(&gui.state_manager.strings.font_size, gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 200.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
-    th.draw_centered("Scroll speed", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 50.0 ,
+    th.draw_centered("Scroll speed", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 150.0 ,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered(&gui.state_manager.strings.scroll_factor,
-                                                                 gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 50.0,
+    th.draw_centered(&gui.state_manager.strings.scroll_factor, gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 150.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
+
+    th.draw_centered("Application Key ID", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 100.0,
+                     24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
+    th.draw_centered(&gui.state_manager.strings.app_key_id, gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 100.0,
+                     24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
+
+    th.draw_centered("Application Key", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0 - 50.0,
+                     24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
+    th.draw_centered(&gui.state_manager.strings.app_key, gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 50.0,
+                     20.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     th.draw_centered("Bucket ID", gui.align.win_width/2.0 - 150.0, gui.align.win_height/2.0,
                                                                  24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
@@ -188,21 +200,29 @@ pub fn render(
 
 pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
-                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 100.0,
+                                  gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 200.0,
                                     300.0, 50.0) {
         gui.state_manager.strings.active_field = 1;
     } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
-                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 50.0,
+                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 150.0,
                                          300.0, 50.0) {
         gui.state_manager.strings.active_field = 2;
     } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
-                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0,
+                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 100.0,
                                          300.0, 50.0) {
         gui.state_manager.strings.active_field = 3;
     } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
-                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 + 50.0,
+                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 - 50.0,
                                          300.0, 50.0) {
         gui.state_manager.strings.active_field = 4;
+    } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
+                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0,
+                                         300.0, 50.0) {
+        gui.state_manager.strings.active_field = 5;
+    } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
+                                         gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 + 50.0,
+                                         300.0, 50.0) {
+        gui.state_manager.strings.active_field = 6;
     } else if gui.align.was_area_clicked(Anchor::CenterLocal, gui.state_manager.cx, gui.state_manager.cy,
                                          gui.align.win_width/2.0 + 150.0, gui.align.win_height/2.0 + 100.0,
                                          300.0, 50.0) {
@@ -221,21 +241,22 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     None
 }
 
-// TODO Handle paste
-pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, _mods: &ModifiersState) {
+pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, mods: &ModifiersState) {
     match key {
         // Backspace key
         VirtualKeyCode::Back => {
             match gui.state_manager.strings.active_field {
                 1 => {gui.state_manager.strings.font_size.pop();},
                 2 => {gui.state_manager.strings.scroll_factor.pop();},
-                3 => {gui.state_manager.strings.bucket_id.pop();},
-                4 => {gui.state_manager.strings.bandwidth_limit.pop();},
+                3 => {gui.state_manager.strings.app_key_id.pop();},
+                4 => {gui.state_manager.strings.app_key.pop();},
+                5 => {gui.state_manager.strings.bucket_id.pop();},
+                6 => {gui.state_manager.strings.bandwidth_limit.pop();},
                 _ => ()
             }
         },
         _ => {
-            let ch = match key {
+            let mut ch = match key {
                 VirtualKeyCode::A => 'a',
                 VirtualKeyCode::B => 'b',
                 VirtualKeyCode::C => 'c',
@@ -274,12 +295,38 @@ pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, _mods: &Modif
                 VirtualKeyCode::Key9 => '9',
                 _ => return,
             };
-            match gui.state_manager.strings.active_field {
-                1 => {gui.state_manager.strings.font_size.push(ch);},
-                2 => {gui.state_manager.strings.scroll_factor.push(ch);},
-                3 => {gui.state_manager.strings.bucket_id.push(ch);},
-                4 => {gui.state_manager.strings.bandwidth_limit.push(ch);},
-                _ => ()
+            if mods.ctrl() && ch == 'v' {
+                let ctx: Result<ClipboardContext, Box<dyn Error>>  = ClipboardProvider::new();
+                match ctx {
+                    Ok(mut c) => {
+                        match c.get_contents() {
+                            Ok(s) => {
+                                match gui.state_manager.strings.active_field {
+                                    1 => {gui.state_manager.strings.font_size.push_str(&s);},
+                                    2 => {gui.state_manager.strings.scroll_factor.push_str(&s);},
+                                    3 => {gui.state_manager.strings.app_key_id.push_str(&s);},
+                                    4 => {gui.state_manager.strings.app_key.push_str(&s);},
+                                    5 => {gui.state_manager.strings.bucket_id.push_str(&s);},
+                                    6 => {gui.state_manager.strings.bandwidth_limit.push_str(&s);},
+                                    _ => ()
+                                }
+                            },
+                            Err(_e) => ()
+                        }
+                    }
+                    Err(_e) => (),
+                };
+            } else {
+                if mods.shift() { ch = ch.to_ascii_uppercase(); }
+                match gui.state_manager.strings.active_field {
+                    1 => {gui.state_manager.strings.font_size.push(ch);},
+                    2 => {gui.state_manager.strings.scroll_factor.push(ch);},
+                    3 => {gui.state_manager.strings.app_key_id.push(ch);},
+                    4 => {gui.state_manager.strings.app_key.push(ch);},
+                    5 => {gui.state_manager.strings.bucket_id.push(ch);},
+                    6 => {gui.state_manager.strings.bandwidth_limit.push(ch);},
+                    _ => ()
+                }
             }
         }
     }

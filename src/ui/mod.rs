@@ -124,6 +124,10 @@ pub struct GUIConfig {
     pub font_size: f32,
     // How fast we scroll in the file-tree
     pub scroll_factor: u8,
+    // applicationKeyId
+    pub app_key_id: String,
+    // applicationKey
+    pub app_key: String,
     // Bucket used for backups
     pub bucket_id: String,
     // Bandwidth limit (bytes/s)
@@ -140,6 +144,8 @@ pub struct GUIConfigStrings {
     pub active_field: usize,
     pub font_size: String,
     pub scroll_factor: String,
+    pub app_key_id: String,
+    pub app_key: String,
     pub bucket_id: String,
     pub bandwidth_limit: String,
 }
@@ -150,6 +156,8 @@ impl GUIConfigStrings {
             active_field: 0,
             font_size: cfg.font_size.to_string(),
             scroll_factor: cfg.scroll_factor.to_string(),
+            app_key_id: cfg.app_key_id.to_string(),
+            app_key: cfg.app_key.to_string(),
             bucket_id: cfg.bucket_id.to_string(),
             bandwidth_limit: (cfg.bandwidth_limit/1000).to_string(), // Divide by 1000 to get KB/s from B/s
         }
@@ -167,6 +175,10 @@ impl GUIConfigStrings {
         if let Ok(n) = fs {cfg.scroll_factor = n.max(1).min(128) as u8;}
         self.scroll_factor = cfg.scroll_factor.to_string();
 
+        let s = self.app_key_id.trim();
+        cfg.app_key_id = s.to_string();
+        let s = self.app_key.trim();
+        cfg.app_key = s.to_string();
         let s = self.bucket_id.trim();
         cfg.bucket_id = s.to_string();
 
@@ -198,6 +210,8 @@ impl Default for GUIConfig {
         GUIConfig {
             font_size: 24.0,
             scroll_factor: 1,
+            app_key_id: "".to_string(),
+            app_key: "".to_string(),
             bucket_id: "".to_string(),
             bandwidth_limit: 0,
             hide_file_names: false,

@@ -71,31 +71,33 @@ pub fn render(
                      96.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
     // Draw options
-    th.draw("This program is a backup tool", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 200.0 ,
+    th.draw("This program is a backup tool", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 250.0 ,
                      24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("It is NOT a synchronization tool - It can only upload files", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 170.0 ,
+    th.draw("It is NOT a synchronization tool - It can only upload files", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 220.0 ,
                      24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("This program targets Backblaze's B2 API", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 140.0 ,
+    th.draw("This program targets Backblaze's B2 API", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 190.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("https://www.backblaze.com/b2/cloud-storage.html", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 110.0 ,
+    th.draw("https://www.backblaze.com/b2/cloud-storage.html", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 160.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("Note that this project is not affiliated with Backblaze", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 80.0 ,
+    th.draw("Note that this project is not affiliated with Backblaze", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 130.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("Be aware of the costs. Refer to License.md for full terms of use.", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 50.0 ,
+    th.draw("Be aware of the costs. Refer to License.md for full terms of use.", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 100.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
-    th.draw("In order to work, you must provide a file named 'credentials'", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 10.0 ,
+    th.draw("Must be configured before use", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 60.0 ,
                      24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("It must consist of one line with the format:", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 20.0 ,
+    th.draw("Requires authentication info, specifically an", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 - 30.0 ,
                      24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw_centered("applicationKeyId:applicationKey", gui.align.win_width/2.0, gui.align.win_height/2.0 + 70.0 ,
+    th.draw_centered("'Application Key ID' and an 'Application Key'", gui.align.win_width/2.0, gui.align.win_height/2.0 + 20.0,
             36.0, f32::INFINITY, [0.25,0.05,0.05,1.0]);
-    th.draw("Additionally, a bucket ID has to be specified in the options", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 100.0 ,
+    th.draw("Additionally, a Bucket ID has to be specified", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 50.0 ,
+            24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
+    th.draw("Be aware that this is stored in plaintext!", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 80.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
-    th.draw("By clicking 'I Understand' you confirm that you have read and", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 140.0 ,
+    th.draw("By clicking 'I Understand' you confirm that you have read and", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 120.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
-    th.draw("agree to the terms specified in License.md - Use at your own risk", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 170.0 ,
+    th.draw("agree to the terms specified in License.md - Use at your own risk", gui.align.win_width/2.0 - 295.0, gui.align.win_height/2.0 + 150.0 ,
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
 

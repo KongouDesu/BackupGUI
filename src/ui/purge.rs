@@ -94,11 +94,12 @@ pub fn start_purge_thread(gui: &mut GuiProgram) {
     gui.state_manager.fileroot.get_files_for_upload(&q);
     let bid = gui.state_manager.config.bucket_id.clone();
     let done = gui.state_manager.is_purge_done.clone();
+    let keystring = format!("{}:{}", gui.state_manager.config.app_key_id, gui.state_manager.config.app_key);
 
-    std::thread::spawn(move || purge_task(q, bid, done));
+    std::thread::spawn(move || purge_task(q, bid, done, keystring));
 }
 
-fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>) {
+fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>, keystring: String) {
     // Collect all files that are supposed to be uploaded
     let local_files = q.lock().unwrap();
     let mut local_files: Vec<String> = local_files.iter().map(|x| x.to_string_lossy().replace("\\", "/")).collect();
@@ -108,7 +109,7 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>) {
     // Get list of files on server
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs_f32(30.0)).build().unwrap();
     // TODO Handle missing auth gracefully
-    let auth = raze::util::authenticate_from_file(&client,"credentials").unwrap();
+    let auth = raze::api::b2_authorize_account(&client,keystring).unwrap();
 
     // Avoid crashing the program if it fails
     let remote_files = match raze::util::list_all_files(&client, &auth, &bid, 1000) {

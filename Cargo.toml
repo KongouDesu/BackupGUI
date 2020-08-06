@@ -22,6 +22,8 @@ nanoserde = "0.1.17"
 scoped-pool = "1.0.0"
 reqwest = "*"
 
+clipboard = "0.5.0"
+
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.8"}
 

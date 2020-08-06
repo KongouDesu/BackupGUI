@@ -136,10 +136,11 @@ pub fn start(gui: &mut GuiProgram) {
     let i = gui.state_manager.upload_state.instances.clone();
     let bid = gui.state_manager.config.bucket_id.clone();
     let bw = gui.state_manager.config.bandwidth_limit;
-    std::thread::spawn(move || start_upload_threads(q, i, &bid, bw));
+    let keystring = format!("{}:{}", gui.state_manager.config.app_key_id, gui.state_manager.config.app_key);
+    std::thread::spawn(move || start_upload_threads(q, i, &bid, bw, keystring));
 }
 
-fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32) {
+fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32, keystring: String) {
     println!("Starting upload, getting file info on stored files");
     // TODO(?) don't hardcode thread count as 8
     let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
@@ -156,9 +157,8 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
 
     // Init backup and authenticate
     let client = reqwest::blocking::Client::builder().timeout(None).build().unwrap();
-    // TODO Handle missing auth gracefully
-    let auth = raze::util::authenticate_from_file(&client,"credentials").unwrap();
-    // TODO Load and use bucket from config
+    // TODO Handle missing/wrong auth gracefully
+    let auth = raze::api::b2_authorize_account(&client,keystring).unwrap();
 
     // Get all files stored on the server
     // We need this to get the 'last changed' metatdata, which we use to determine
