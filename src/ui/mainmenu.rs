@@ -82,6 +82,9 @@ pub fn render(
 pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, -196.0, 100.0, 179.0, 148.0) {
         println!("Swapping state to FileTree");
+        if std::path::Path::new("backuplist.dat").exists() {
+            gui.state_manager.deserialize("backuplist.dat");
+        }
         Some(UIState::FileTree)
     } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 0.0, 100.0, 180.0, 180.0) {
         println!("Swapping state to Upload");

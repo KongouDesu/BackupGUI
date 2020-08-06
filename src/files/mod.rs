@@ -281,14 +281,12 @@ impl DirEntry {
     /// If 'some' is found, it is expanded and it'll search for 'path'
     /// etc.
     pub fn expand_for_path(&self, path: &str, action: Action) {
-        println!("Expand for {}",path);
-        // First character cannot be a '/' (i.e. no name)
-        let x = path[1..].find('/');
+        let x = path.find('/');
         let name;
         let remainder;
         match x {
             Some(n)=> {
-                name = &path[1..n+1];
+                name = &path[..n];
                 remainder = &path[n+1..];
             },
             None => {
@@ -296,7 +294,6 @@ impl DirEntry {
                 remainder = "";
             },
         };
-        println!("{:?},{},{}",x,name,remainder);
 
         for child in self.children.lock().unwrap().iter() {
             // Find name without trailing '/'

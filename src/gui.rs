@@ -382,7 +382,7 @@ impl GuiProgram {
             true => UIState::Main,
             false => UIState::Consent,
         };
-        let mut this = GuiProgram {
+        let this = GuiProgram {
             vs_module,
             fs_module,
             pipeline_layout,
@@ -416,9 +416,6 @@ impl GuiProgram {
             },
             timer: 0.0,
         };
-        if std::path::Path::new("backuplist.dat").exists() {
-            this.state_manager.deserialize("backuplist.dat");
-        }
 
         (this, Some(init_encoder.finish()))
     }

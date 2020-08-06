@@ -271,12 +271,24 @@ impl StateManager {
                 continue;
             }
             let line = line.unwrap();
+            // Note: on Unix, we add +1 to the offset to remove the leading '/' (the root)
+            // This is because the root element is already factored in
             if line.starts_with("UPLOAD ") {
-                // offset 7 for "UPLOAD " (note the space)
-                self.fileroot.expand_for_path(&line[7..], Action::Upload);
+                if cfg!(windows) {
+                    // offset 7 for "UPLOAD " (note the space)
+                    self.fileroot.expand_for_path(&line[7..], Action::Upload);
+                } else {
+                    // offset 8 for "UPLOAD /" (note the space)
+                    self.fileroot.expand_for_path(&line[8..], Action::Upload);
+                }
             } else if line.starts_with("EXCLUDE ") {
-                // offset 8 for "EXCLUDE " (note the space)
-                self.fileroot.expand_for_path(&line[8..], Action::Exclude);
+                if cfg!(windows) {
+                    // offset 8 for "EXCLUDE " (note the space)
+                    self.fileroot.expand_for_path(&line[8..], Action::Exclude);
+                } else {
+                    // offset 9 for "EXCLUDE /"
+                    self.fileroot.expand_for_path(&line[9..], Action::Exclude);
+                }
             } else {
                 println!("Malformed entry - {}", line);
             }
