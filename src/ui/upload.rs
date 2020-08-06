@@ -264,9 +264,17 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                         };
 
 
+                        // Under Unix, all paths are naturally prefix with '/' (the root)
+                        // B2 will not emulate folders if we start the path with a slash, 
+                        // so we strip it here to make it behave correctly
+                        let name_in_b2 = if cfg!(windows) {
+                                &path_str
+                            } else {
+                                &path_str[1..]
+                            };
 
                         let params = raze::api::FileParameters {
-                            file_path: &path_str,
+                            file_path: name_in_b2,
                             file_size: filesize,
                             content_type: None, // auto
                             content_sha1: Sha1Variant::HexAtEnd,

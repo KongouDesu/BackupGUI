@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use std::fs;
+#[cfg(windows)]
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::Write;
@@ -79,19 +80,25 @@ pub fn get_roots() -> Result<DirEntry,&'static str> {
 }
 
 // On Linux the root element is just '/'
-// TODO Test this code
+// As there is only a single root, we do not need a dummy element
+// Note that we have to strip the root '/' when uploading files
+// This is because B2 will not emulate folders otherwise
 // TODO What about macOS?
 #[cfg(not(windows))]
-pub fn get_roots() -> Result<Vec<DirEntry>,&'static str> {
-    Ok(vec!(DirEntry {
+pub fn get_roots() -> Result<DirEntry,&'static str> {
+    // Dummy element for parity with windows, see get_roots for windows for details
+    let root_element = DirEntry {
         kind: EntryKind::Directory,
         name: "/".to_owned(),
         path: "/".to_owned(),
-        action: Arc::new(Mutex::new(Action::Nothing)),
+        action: Arc::new(Mutex::new(Action::Exclude)),
         children: Arc::new(Mutex::new(vec![])),
-        indexed: Arc::new(Mutex::new(false)),
-        expanded: Arc::new(Mutex::new(false)),
-    }))
+        indexed: Arc::new(AtomicBool::new(false)),
+        expanded: Arc::new(AtomicBool::new(false)),
+    };
+    root_element.expand();
+
+    Ok(root_element)
 }
 
 /// Type of a 'DirEntry'
@@ -274,12 +281,14 @@ impl DirEntry {
     /// If 'some' is found, it is expanded and it'll search for 'path'
     /// etc.
     pub fn expand_for_path(&self, path: &str, action: Action) {
-        let x = path.find('/');
+        println!("Expand for {}",path);
+        // First character cannot be a '/' (i.e. no name)
+        let x = path[1..].find('/');
         let name;
         let remainder;
         match x {
             Some(n)=> {
-                name = &path[0..n];
+                name = &path[1..n+1];
                 remainder = &path[n+1..];
             },
             None => {
@@ -287,6 +296,7 @@ impl DirEntry {
                 remainder = "";
             },
         };
+        println!("{:?},{},{}",x,name,remainder);
 
         for child in self.children.lock().unwrap().iter() {
             // Find name without trailing '/'

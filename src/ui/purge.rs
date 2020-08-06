@@ -101,8 +101,16 @@ pub fn start_purge_thread(gui: &mut GuiProgram) {
 
 fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>, keystring: String) {
     // Collect all files that are supposed to be uploaded
-    let local_files = q.lock().unwrap();
-    let mut local_files: Vec<String> = local_files.iter().map(|x| x.to_string_lossy().replace("\\", "/")).collect();
+    // On Unix, all paths start with '/' (the root). B2 will not emulate folders if we start file
+    // paths with a slash, so we remove it during the upload process. 
+    // This naturally means we have to remove it here to compare
+    let lf = q.lock().unwrap();
+    let mut local_files: Vec<String>;
+    if cfg!(windows) {
+        local_files = lf.iter().map(|x| x.to_string_lossy().replace("\\", "/")).collect();
+    } else {
+        local_files = lf.iter().map(|x| x.to_string_lossy().replace("\\", "/")[1..].to_string()).collect();
+    }
     local_files.sort();
     println!("Collected local files");
 

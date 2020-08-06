@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use winit::{
     event::{self, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
+    dpi::PhysicalSize,
 };
 
 use crate::gui::GuiProgram;
@@ -40,8 +41,9 @@ async fn setup(title: &str) -> Setup {
     log::info!("Initializing the surface...");
 
     let (window, size, surface) = {
-        let mut builder = winit::window::WindowBuilder::new();
-        builder = builder.with_title(title);
+        let builder = winit::window::WindowBuilder::new()
+            .with_title(title)
+            .with_inner_size(PhysicalSize::new(1024,768));
 
         let window = builder.build(&event_loop).unwrap();
         let size = window.inner_size();
