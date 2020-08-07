@@ -5,10 +5,10 @@ use std::time::Duration;
 use scoped_pool::Pool;
 use wgpu::BufferUsage;
 use zerocopy::AsBytes;
+use std::sync::mpsc::Sender;
 
 use crate::gui::GuiProgram;
 use crate::ui::align::Anchor;
-use std::sync::atomic::{Ordering, AtomicBool};
 
 pub fn render(
     gui: &mut GuiProgram,
@@ -88,18 +88,24 @@ pub fn render(
 // Start the purge thread to run in the background
 pub fn start_purge_thread(gui: &mut GuiProgram) {
     println!("Start purge");
-    gui.state_manager.is_purge_done.swap(false, Ordering::Relaxed);
 
     let q = gui.state_manager.upload_state.queue.clone();
-    gui.state_manager.fileroot.get_files_for_upload(&q);
     let bid = gui.state_manager.config.bucket_id.clone();
-    let done = gui.state_manager.is_purge_done.clone();
+    let tx = gui.state_manager.status_channel_tx.clone();
     let keystring = format!("{}:{}", gui.state_manager.config.app_key_id, gui.state_manager.config.app_key);
 
-    std::thread::spawn(move || purge_task(q, bid, done, keystring));
+    std::thread::spawn(move || purge_task(q, bid, tx, keystring));
 }
 
-fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>, keystring: String) {
+fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, tx: Sender<String>, keystring: String) {
+    // Get local files
+    // Make sure the filetree is exactly the stored list
+    let root = crate::files::get_roots().unwrap();
+    if std::path::Path::new("backuplist.dat").exists() {
+        root.deserialize("backuplist.dat");
+    }
+    root.get_files_for_upload(&q);
+
     // Collect all files that are supposed to be uploaded
     // On Unix, all paths start with '/' (the root). B2 will not emulate folders if we start file
     // paths with a slash, so we remove it during the upload process. 
@@ -116,14 +122,21 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>, k
 
     // Get list of files on server
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs_f32(30.0)).build().unwrap();
-    // TODO Handle missing auth gracefully
-    let auth = raze::api::b2_authorize_account(&client,keystring).unwrap();
 
-    // Avoid crashing the program if it fails
+    let auth = match raze::api::b2_authorize_account(&client,keystring) {
+        Ok(a) => a,
+        Err(_e) => {
+            tx.send("Authentication Failed".to_string()).unwrap();
+            return;
+        },
+    };
+
+    // Get list of files stored
     let remote_files = match raze::util::list_all_files(&client, &auth, &bid, 1000) {
         Ok(f) => f,
         Err(e) => {
             println!("Failed to get remote files - {:?}", e);
+            tx.send("Failed talking to B2 - Check your Bucket ID".to_string()).unwrap();
             return
         },
     };
@@ -177,5 +190,5 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, done: Arc<AtomicBool>, k
     });
 
     println!("Done purging");
-    done.swap(true, Ordering::Relaxed);
+    tx.send("Purge completed".to_string()).unwrap();
 }

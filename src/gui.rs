@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use std::sync::{Arc, Mutex};
+use std::sync::{Mutex};
 
 use nanoserde::SerJson;
 use wgpu::vertex_attr_array;
@@ -12,7 +12,6 @@ use crate::ui;
 use crate::ui::{filetree, UIState};
 use crate::ui::{GUIConfig, GUIConfigStrings};
 use crate::ui::align::AlignConfig;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes, FromBytes, Debug)]
@@ -382,6 +381,9 @@ impl GuiProgram {
             true => UIState::Main,
             false => UIState::Consent,
         };
+
+        let (tx,rx) = std::sync::mpsc::channel::<String>();
+
         let this = GuiProgram {
             vs_module,
             fs_module,
@@ -399,7 +401,9 @@ impl GuiProgram {
                 scroll: 0.0,
                 state: start_state,
                 upload_state: Default::default(),
-                is_purge_done: Arc::new(AtomicBool::new(false)),
+                status_message: None,
+                status_channel_rx: rx,
+                status_channel_tx: tx,
                 cx: 0.0,
                 cy: 0.0,
             },
@@ -515,17 +519,10 @@ impl GuiProgram {
         }
 
         //// Check if we should swap state
-        let next = match &self.state_manager.state {
-            UIState::Purge => {
-                if self.state_manager.is_purge_done.load(Ordering::Relaxed) {
-                    Some(UIState::Main)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
-        if let Some(next) = next { self.state_manager.state = next; }
+        if let Ok(s) = self.state_manager.status_channel_rx.try_recv() {
+            self.state_manager.state = UIState::Main;
+            self.state_manager.status_message = Some(s);
+        }
 
         match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),

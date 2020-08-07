@@ -10,7 +10,7 @@ use std::fs;
 #[cfg(windows)]
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Write, BufRead};
 use std::sync::{Arc, Mutex};
 use std::cmp::Ordering;
 use std::sync::atomic::AtomicBool;
@@ -351,6 +351,69 @@ impl DirEntry {
         }
         {
             queue.lock().unwrap().append(&mut buffer);
+        }
+    }
+
+    /// Write the current config to a file
+    ///
+    /// The output file is a minimal list of directories and their rules
+    /// The idea is that there's rules like 'dir1/dir2/dir3 UPLOAD'
+    /// When loading, first dir1 is expanded. If we find dir2 we expand that, and so on
+    ///
+    /// This runs through the current tree, depth-first
+    /// If a node is marked 'upload' we add that to the output list
+    /// Every node in the children will not be added, unless they are marked 'exclude'
+    /// This rule is applied i.e. you can do
+    ///  UPLOAD  root/
+    /// EXCLUDE     dir1/
+    /// INHERIT          dir2/
+    ///  UPLOAD          dir3/
+    /// INHERIT              dir4/
+    /// INHERIT      dir5/
+    /// Here, dir3, dir4 and dir5 will be uploaded
+    /// Note dir3+dir4 work despite the parent being 'exclude'
+    pub fn serialize<T: AsRef<Path>>(&self, file: T) {
+        let path = file.as_ref();
+        let mut file = std::fs::File::create(path).unwrap();
+
+        for child in self.children.lock().unwrap().iter() {
+            child.serialize_rec(&mut file, false);
+        }
+    }
+
+    /// Load the list of files to backup from a file
+    /// Counterpart to serialize
+    pub fn deserialize<T: AsRef<Path>>(&self, file: T) {
+        let path = file.as_ref();
+        let file = std::fs::File::open(path).unwrap();
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines() {
+            if line.is_err() {
+                println!("Malformed entry - {}", line.err().unwrap());
+                continue;
+            }
+            let line = line.unwrap();
+            // Note: on Unix, we add +1 to the offset to remove the leading '/' (the root)
+            // This is because the root element is already factored in
+            if line.starts_with("UPLOAD ") {
+                if cfg!(windows) {
+                    // offset 7 for "UPLOAD " (note the space)
+                    self.expand_for_path(&line[7..], Action::Upload);
+                } else {
+                    // offset 8 for "UPLOAD /" (note the space)
+                    self.expand_for_path(&line[8..], Action::Upload);
+                }
+            } else if line.starts_with("EXCLUDE ") {
+                if cfg!(windows) {
+                    // offset 8 for "EXCLUDE " (note the space)
+                    self.expand_for_path(&line[8..], Action::Exclude);
+                } else {
+                    // offset 9 for "EXCLUDE /"
+                    self.expand_for_path(&line[9..], Action::Exclude);
+                }
+            } else {
+                println!("Malformed entry - {}", line);
+            }
         }
     }
 }

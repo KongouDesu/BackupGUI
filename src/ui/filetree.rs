@@ -192,7 +192,7 @@ fn render_subtree_text(gui: &crate::GuiProgram, root: &DirEntry, mut y: f32, mut
 pub fn handle_click(gui: &GuiProgram, button: u8) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::TopRight, gui.state_manager.cx, gui.state_manager.cy, 64.0, 0.0, 64.0, 32.0) {
         println!("Return to Main -- Saving tree");
-        gui.state_manager.serialize("backuplist.dat");
+        gui.state_manager.fileroot.serialize("backuplist.dat");
         Some(UIState::Main)
     } else {
         // Offset 'y' based on scroll

@@ -71,7 +71,12 @@ pub fn render(
         );
     }
 
-    gui.state_manager.text_handler.lock().unwrap().draw_centered("Backup", gui.align.win_width/2.0, gui.align.win_height/2.0 - 100.0, 128.0, f32::INFINITY, [0.0,0.0,0.0,1.0]);
+    gui.state_manager.text_handler.lock().unwrap().draw_centered("Backup", gui.align.win_width/2.0, gui.align.win_height/2.0 - 200.0, 128.0, f32::INFINITY, [0.0,0.0,0.0,1.0]);
+
+    if let Some(s) = &gui.state_manager.status_message {
+        gui.state_manager.text_handler.lock().unwrap().draw_centered(s, gui.align.win_width/2.0, gui.align.win_height/2.0 - 75.0, 48.0, f32::INFINITY, [0.7,0.0,0.0,1.0]);
+    }
+
     gui.state_manager.text_handler.lock().unwrap().flush(&device,&mut encoder, frame, (gui.sc_desc.width,gui.sc_desc.height));
     let cb2 = encoder.finish();
 
@@ -83,14 +88,17 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, -196.0, 100.0, 179.0, 148.0) {
         println!("Swapping state to FileTree");
         if std::path::Path::new("backuplist.dat").exists() {
-            gui.state_manager.deserialize("backuplist.dat");
+            gui.state_manager.fileroot.deserialize("backuplist.dat");
         }
+        gui.state_manager.status_message = None;
         Some(UIState::FileTree)
     } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 0.0, 100.0, 180.0, 180.0) {
         println!("Swapping state to Upload");
+        gui.state_manager.status_message = None;
         Some(UIState::Upload)
     } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 196.0, 100.0, 196.0, 148.0) {
         println!("Swapping state to Options");
+        gui.state_manager.status_message = None;
         Some(UIState::Options)
     } else {
         None

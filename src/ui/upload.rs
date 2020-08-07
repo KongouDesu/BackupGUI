@@ -2,10 +2,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use raze::api::Sha1Variant;
+use raze::api::{Sha1Variant};
 use scoped_pool::Pool;
 use wgpu::BufferUsage;
 use zerocopy::AsBytes;
+use std::sync::mpsc::Sender;
 
 use crate::files::tracked_reader::TrackedReader;
 use crate::gui::{GuiProgram, Vertex};
@@ -125,6 +126,14 @@ pub fn start(gui: &mut GuiProgram) {
         gui.state_manager.upload_state.running = true;
     }
 
+    // Create a new queue
+    // The 'get_files_for_upload' is not stopped even if the main upload thread ends
+    // That means if we get an auth error, it would still be counting
+    // Since counting can sometimes take minutes (i.e. cold drives) we could end up having
+    // more than one 'get_files_for_upload' threads running, resulting in duplicate files in the queue
+    // So, to fix it we make a new queue here
+    // TODO Stop 'get_files_for_upload' if the other upload thread exits
+    gui.state_manager.upload_state.queue = Arc::new(Mutex::new(vec![]));
 
     // Start the thread that queues files for upload
     let r = gui.state_manager.fileroot.clone();
@@ -137,13 +146,12 @@ pub fn start(gui: &mut GuiProgram) {
     let bid = gui.state_manager.config.bucket_id.clone();
     let bw = gui.state_manager.config.bandwidth_limit;
     let keystring = format!("{}:{}", gui.state_manager.config.app_key_id, gui.state_manager.config.app_key);
-    std::thread::spawn(move || start_upload_threads(q, i, &bid, bw, keystring));
+    let tx = gui.state_manager.status_channel_tx.clone();
+    std::thread::spawn(move || start_upload_threads(q, i, &bid, bw, keystring, tx));
 }
 
-fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32, keystring: String) {
+fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32, keystring: String, tx: Sender<String>) {
     println!("Starting upload, getting file info on stored files");
-    // TODO(?) don't hardcode thread count as 8
-    let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
 
     // Bandwidth per thread
     // 0 = unlimited, otherwise we need at least 1 for each thread
@@ -154,21 +162,35 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
         bandwidth = 0;
     }
 
-
     // Init backup and authenticate
     let client = reqwest::blocking::Client::builder().timeout(None).build().unwrap();
-    // TODO Handle missing/wrong auth gracefully
-    let auth = raze::api::b2_authorize_account(&client,keystring).unwrap();
+
+    let auth = match raze::api::b2_authorize_account(&client,keystring) {
+        Ok(a) => a,
+        Err(_e) => {
+            tx.send("Authentication failed".to_string()).unwrap();
+            return;
+        },
+    };
 
     // Get all files stored on the server
     // We need this to get the 'last changed' metatdata, which we use to determine
     // if the file has changed and needs to be re-uploaded
-    let mut stored_file_list = Arc::new(raze::util::list_all_files(&client, &auth, bucket_id, 1000).unwrap());
+    let mut stored_file_list = match raze::util::list_all_files(&client, &auth, &bucket_id, 1000) {
+        Ok(f) => Arc::new(f),
+        Err(e) => {
+            println!("Failed to get remote files - {:?}", e);
+            tx.send("Failed talking to B2 - Check your Bucket ID".to_string()).unwrap();
+            return
+        },
+    };
     // Sort so we can binary search later
     Arc::get_mut(&mut stored_file_list).unwrap().sort();
     println!("Got {} files from remote", stored_file_list.len());
 
     println!("Starting upload threads");
+    // TODO(?) don't hardcode thread count as 8
+    let pool = Pool::new(8); // Number of upload threads = number of concurrent uploads
     pool.scoped(|scope| {
         // Spawn 1 upload task per worker
         for i in 0..pool.workers() {
