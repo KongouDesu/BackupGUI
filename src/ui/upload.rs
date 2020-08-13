@@ -136,9 +136,11 @@ pub fn start(gui: &mut GuiProgram) {
     gui.state_manager.upload_state.queue = Arc::new(Mutex::new(vec![]));
 
     // Start the thread that queues files for upload
-    let r = gui.state_manager.fileroot.clone();
+    // First, make sure the file-tree is read
+    let root = crate::files::get_roots().unwrap();
+    root.deserialize("backuplist.dat");
     let q = gui.state_manager.upload_state.queue.clone();
-    std::thread::spawn(move || r.get_files_for_upload(&q));
+    std::thread::spawn(move || root.get_files_for_upload(&q));
 
     // Start the upload threads
     let q = gui.state_manager.upload_state.queue.clone();
