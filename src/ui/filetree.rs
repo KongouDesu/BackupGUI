@@ -141,10 +141,10 @@ fn render_subtree(gui: &crate::GuiProgram, root: &DirEntry, mut y: f32, mut inde
     if y >= -gui.state_manager.config.font_size && y <= gui.align.win_height {
         if *root.action.lock().unwrap() == Action::Exclude {
             vertex_buffer.append(&mut gui.align.rectangle(Anchor::TopLeft, indent, y,
-                                                          gui.align.win_width-indent, gui.state_manager.config.font_size, [1.0,0.0,0.0,1.0]));
+                                                          gui.align.win_width-indent, gui.state_manager.config.font_size, [0.8,0.0,0.0,1.0]));
         } else if *root.action.lock().unwrap() == Action::Upload {
             vertex_buffer.append(&mut gui.align.rectangle(Anchor::TopLeft, indent, y,
-                                                          gui.align.win_width-indent, gui.state_manager.config.font_size, [0.0,1.0,0.0,1.0]));
+                                                          gui.align.win_width-indent, gui.state_manager.config.font_size, [0.0,0.8,0.0,1.0]));
         }
     } else if y > gui.align.win_height {
         // We will never return to the visible area, stop drawing

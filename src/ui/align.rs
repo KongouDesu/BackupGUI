@@ -99,10 +99,10 @@ impl AlignConfig {
                 inside_rect(cx,cy,x,y,w,h)
             },
             Anchor::TopRight => {
-                inside_rect(cx,cy,self.win_width - x,y,w,h)
+                inside_rect(cx,cy,self.win_width - x - w,y,w,h)
             },
             Anchor::BottomLeft => {
-                inside_rect(cx,cy,x,self.win_height - y,w,h)
+                inside_rect(cx,cy,x,self.win_height - y - h,w,h)
             },
             Anchor::BottomRight => {
                 inside_rect(cx,cy,self.win_width - x - w,self.win_height-y - h,w,h)

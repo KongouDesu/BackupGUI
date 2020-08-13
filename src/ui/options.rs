@@ -38,6 +38,9 @@ pub fn render(
         vertices.append(&mut Vertex::rect(gui.align.win_width/2.0, gui.align.win_height/2.0 - 225.0 + 50.0*i, 300.0, 50.0, col_right));
     }
 
+    vertices.append(&mut gui.align.rectangle(Anchor::CenterGlobal, 173.0, 248.0,173.0,175.0, [0.8,0.8,0.8,1.0]));
+
+
 
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
@@ -164,7 +167,7 @@ pub fn render(
     ///// Images
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    let mut vertices = gui.align.image(Anchor::TopLeft, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,651.0,128.0,64.0]));
+    let mut vertices = gui.align.image(Anchor::TopRight, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,651.0,128.0,64.0]));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, 175.0, 250.0, 169.0, 171.0, 0.0, Some([180.0,234.0,169.0,171.0])));
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
@@ -232,9 +235,9 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     }
     gui.state_manager.strings.destring(&mut gui.state_manager.config);
 
-    if gui.align.was_area_clicked(Anchor::TopLeft, gui.state_manager.cx, gui.state_manager.cy, 0.0, 0.0, 64.0, 32.0) {
+    if gui.align.was_area_clicked(Anchor::TopRight, gui.state_manager.cx, gui.state_manager.cy, 0.0, 0.0, 64.0, 32.0) {
         return Some(UIState::Main)
-    } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 175.0, 250.0, 169.0, 171.0,) {
+    } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 173.0, 248.0, 173.0, 175.0,) {
         crate::ui::purge::start_purge_thread(gui);
         return Some(UIState::Purge)
     }
