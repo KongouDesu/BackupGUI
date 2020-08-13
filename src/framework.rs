@@ -99,7 +99,6 @@ fn start(
 
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        // TODO: Allow srgb unconditionally
         format: wgpu::TextureFormat::Bgra8UnormSrgb,
         width: size.width,
         height: size.height,
@@ -107,7 +106,7 @@ fn start(
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
-    log::info!("Initializing the example...");
+    // Init the program itself
     let (mut program, init_command_buf) = GuiProgram::init(&sc_desc, &device);
 
     if let Some(command_buf) = init_command_buf {
@@ -125,7 +124,7 @@ fn start(
         };
         match event {
             event::Event::MainEventsCleared => {
-                if last_update_inst.elapsed() > Duration::from_millis(7) {
+                if last_update_inst.elapsed() > Duration::from_millis(15) {
                     program.timer += last_update_inst.elapsed().as_secs_f32();
                     window.request_redraw();
                     last_update_inst = Instant::now();

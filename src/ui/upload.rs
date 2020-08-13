@@ -152,7 +152,7 @@ pub fn start(gui: &mut GuiProgram) {
     std::thread::spawn(move || start_upload_threads(q, i, &bid, bw, keystring, tx));
 }
 
-fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: i32, keystring: String, tx: Sender<String>) {
+fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Vec<UploadInstance>>>, bucket_id: &str, bw: u32, keystring: String, tx: Sender<String>) {
     println!("Starting upload, getting file info on stored files");
 
     // Bandwidth per thread

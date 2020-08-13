@@ -101,9 +101,6 @@ pub fn render(
             24.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
 
 
-
-
-
     // Flush text
     th.flush(&device,&mut encoder, frame, (gui.sc_desc.width,gui.sc_desc.height));
 
@@ -115,6 +112,7 @@ pub fn render(
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let vertices;
+    // Use greyed out 'accept' until 10 seconds have passed
     if gui.timer < 10.0 {
         vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 250.0, 200.0, 62.0, 0.0, Some([0.0,781.0,200.0,62.0]));
     } else {
@@ -153,6 +151,7 @@ pub fn render(
     vec![cb1,cb2,cb3]
 }
 
+// Handle 'accept' click - Can only be pressed after 10 seconds
 pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy,
                                   0.0, 250.0,

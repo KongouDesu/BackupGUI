@@ -20,7 +20,6 @@ pub fn render(
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    //let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
     let vertices = gui.align.image(Anchor::CenterGlobal, 0.0, 0.0, 256.0, 256.0, gui.timer, Some([0.0,0.0,256.0,256.0]));
 
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);

@@ -27,18 +27,21 @@ pub mod consent;
 pub struct StateManager {
     // Filesystem roots, i.e. top-most DirEntry
     // On Linux, this is the '/' root
-    // On Windows, this is all dummy object 'root element' containing the drives i.e. C:\, D:\, E:\ etc.
+    // On Windows, this is a dummy object 'root element' containing a list of drives i.e. C:\, D:\, E:\ etc.
     // See the files module for further explanation
     pub fileroot: DirEntry,
-    // Config, i.e. font size and other persistent info
+    // Config, i.e. font size and other persistent info - stored to a file
     pub config: GUIConfig,
+    // Holds the input the user types in the options menu
     pub strings: GUIConfigStrings,
     // Text handler to draw text
     pub text_handler: Mutex<TextHandler>,
     // How far down the list we've scrolled
     pub scroll: f32,
-    // Which state we're in (and thus, what should be shown/reacted to)
+    // Which state we're in (and thus, what should be rendered, have clicks handled etc.)
     pub state: UIState,
+
+    // State info specifically for keeping track of upload progress
     pub upload_state: UploadState,
 
     // If this is a Some, a message box is shown in the main menu with the contained string
@@ -58,9 +61,10 @@ pub struct UploadState {
     pub running: bool,
     // Whether or not purge is running
     pub purging: bool,
-    // Each of the concurrent upload threads
+    // Each of the concurrent upload thread state trackers
     pub instances: Arc<Mutex<Vec<UploadInstance>>>,
     // Queue of files to be uploaded, shared between threads
+    // One thread populates this, a number of threads consumes from it
     pub queue: Arc<Mutex<Vec<PathBuf>>>,
 }
 
@@ -87,7 +91,7 @@ impl Default for UploadState {
     }
 }
 
-// name: filename
+// name: filename - Only shown if enabled in options
 // size: total bytes to upload
 // progress: how much has been uploaded
 // receiver: used to receive progress updates
@@ -110,6 +114,7 @@ pub struct UploadInstance {
 /// FileTree: File tree browser, for selecting what files to upload/exclude
 /// Upload: Displays upload progress + some settings to limit bandwidth usage while uploading
 /// Purge: Switched to after upload, gets rid of files in the cloud that are no longer on the drive (B2 hide)
+/// Options: Configure the program or start purge
 #[allow(dead_code)]
 pub enum UIState {
     Consent,
@@ -123,19 +128,19 @@ pub enum UIState {
 /// Contains the settings for the UI, i.e. colors, size and other persistent data
 #[derive(Debug,DeJson,SerJson)]
 pub struct GUIConfig {
-    // Size of the font (in pixels)
-    // Note that the size of an element is determined by this
+    // Size of the font (in pixels) in the file tree
+    // Note that the size of entries are based on this
     pub font_size: f32,
     // How fast we scroll in the file-tree
     pub scroll_factor: u8,
-    // applicationKeyId
+    // applicationKeyId from B2
     pub app_key_id: String,
-    // applicationKey
+    // applicationKey from B2
     pub app_key: String,
-    // Bucket used for backups
+    // Bucket files are backed up to
     pub bucket_id: String,
     // Bandwidth limit (bytes/s)
-    pub bandwidth_limit: i32,
+    pub bandwidth_limit: u32,
     // Whether or not to show file paths while uploading
     pub hide_file_names: bool,
     // Whether or not the user has marked that they understand the consequences of using the program
@@ -187,7 +192,7 @@ impl GUIConfigStrings {
         cfg.bucket_id = s.to_string();
 
         let s = self.bandwidth_limit.trim();
-        let fs = i32::from_str(s);
+        let fs = u32::from_str(s);
         if let Ok(n) = fs {cfg.bandwidth_limit = n.min(1000000)*1000;} // Multiply by 1000 to get B/s from KB/s
 
         self.bandwidth_limit = (cfg.bandwidth_limit/1000).to_string();
@@ -226,13 +231,13 @@ impl Default for GUIConfig {
 
 impl StateManager {
     // Scroll an amount, uses +/- to scroll up/down
-    pub fn scroll(&mut self, amount: f32, scale: f32, max: f32) {
-        self.scroll = (self.scroll+amount*self.config.font_size*scale).min(0.0).max(-max);
+    pub fn scroll(&mut self, amount: f32, max: f32) {
+        self.scroll = (self.scroll+amount*self.config.font_size).min(0.0).max(-max);
     }
 
+    // Call whenever the mouse is moved s.t. it can be accessed anywhere
     pub fn cursor_moved(&mut self, x: f32, y: f32) {
         self.cx = x;
         self.cy = y;
-
     }
 }

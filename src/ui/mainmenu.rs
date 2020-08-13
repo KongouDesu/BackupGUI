@@ -14,7 +14,6 @@ pub fn render(
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    //let mut vertices = TexVertex::rect(700.0, 200.0, 600.0, 800.0, gui.timer);
     let mut vertices = gui.align.image(Anchor::CenterGlobal, 196.0, 100.0, 196.0, 196.0, gui.timer, Some([0.0,0.0,256.0,256.0]));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, 0.0, 100.0, 180.0, 180.0, 0.0,Some([0.0,406.0,180.0,180.0])));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, -196.0, 100.0, 179.0, 148.0, 0.0,Some([0.0,257.0,179.0,148.0])));
@@ -49,7 +48,6 @@ pub fn render(
 
 
     ///// Text
-
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Text") });
 
@@ -84,6 +82,7 @@ pub fn render(
     vec![cb1,cb2]
 }
 
+// We have 3 buttons each taking us to different states
 pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, -196.0, 100.0, 179.0, 148.0) {
         println!("Swapping state to FileTree");

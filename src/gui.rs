@@ -84,17 +84,11 @@ fn rotate_around(x: f32, y: f32, cx: f32, cy: f32, a: f32) -> (f32,f32) {
 }
 
 pub struct GuiProgram {
-    pub vs_module: wgpu::ShaderModule,
-    pub fs_module: wgpu::ShaderModule,
-    pub pipeline_layout: wgpu::PipelineLayout,
     pub pipeline: wgpu::RenderPipeline,
     pub uniforms: wgpu::BindGroup,
     pub transform: wgpu::Buffer,
-    pub rebuild_pipeline: bool,
     pub sc_desc: wgpu::SwapChainDescriptor,
     pub state_manager: ui::StateManager,
-    pub tex_vs_module: wgpu::ShaderModule,
-    pub tex_fs_module: wgpu::ShaderModule,
     pub tex_pipeline: wgpu::RenderPipeline,
     pub texture_bind_group: wgpu::BindGroup,
     pub align: AlignConfig,
@@ -170,7 +164,6 @@ impl GuiProgram {
         let mut init_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("Init CE") });
 
-
         // Orthographic transform, allows us to render in screen coordinates
         let transform = device.create_buffer_with_data(
             ortho(0.0,sc_desc.width as f32, 0.0, sc_desc.height as f32, 1.0, -1.0).as_bytes(),
@@ -234,6 +227,7 @@ impl GuiProgram {
         });
 
         // Create the texture
+        // We embed the spritesheet bytes, then load it to a GPU texture at runtime
         let img_data = include_bytes!("../spritesheet.png");
         let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Png)
             .unwrap()
@@ -289,7 +283,7 @@ impl GuiProgram {
             lod_max_clamp: 100.0,
             compare: wgpu::CompareFunction::Undefined,
         });
-        // Create bind group
+        // Create bind group for the texture
         let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &texture_layout,
             bindings: &[
@@ -304,6 +298,8 @@ impl GuiProgram {
             ],
             label: None,
         });
+
+        // Build the texture shader modules
         let tex_vs_bytes = framework::load_glsl(include_str!("texture.vert"),
                                                 framework::ShaderStage::Vertex);
         let tex_fs_bytes = framework::load_glsl(include_str!("texture.frag"),
@@ -312,6 +308,7 @@ impl GuiProgram {
         let tex_vs_module = device.create_shader_module(&tex_vs_bytes);
         let tex_fs_module = device.create_shader_module(&tex_fs_bytes);
 
+        // Texture render pipeline - Note blend mode for transparency
         let texture_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &texture_pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
@@ -358,6 +355,7 @@ impl GuiProgram {
             alpha_to_coverage_enabled: false,
         });
 
+        // Shader modules for primitives / shapes
         let vs_bytes =
             framework::load_glsl(include_str!("shader.vert"), framework::ShaderStage::Vertex);
         let fs_bytes = framework::load_glsl(
@@ -375,23 +373,23 @@ impl GuiProgram {
             &pipeline_layout,
         );
 
+        // Load config from a file, if the file is not found, uses a default
         let cfg = GUIConfig::from_file("config.cfg");
         let strings = GUIConfigStrings::from_cfg(&cfg);
+        // Skip the 'consent' state if the config indicates it's already been accepted
         let start_state = match cfg.consented {
             true => UIState::Main,
             false => UIState::Consent,
         };
 
+        // Create the monolithic GuiProgram struct
+        // This keeps track of all state in the program
+        // (This is what happens when you don't use a framework)
         let (tx,rx) = std::sync::mpsc::channel::<String>();
-
         let this = GuiProgram {
-            vs_module,
-            fs_module,
-            pipeline_layout,
             pipeline,
             uniforms,
             transform,
-            rebuild_pipeline: false,
             sc_desc: sc_desc.clone(),
             state_manager: ui::StateManager {
                 fileroot: files::get_roots().unwrap(),
@@ -407,12 +405,9 @@ impl GuiProgram {
                 cx: 0.0,
                 cy: 0.0,
             },
-            tex_vs_module,
-            tex_fs_module,
             tex_pipeline: texture_pipeline,
             texture_bind_group,
             align: AlignConfig {
-                scale: 1.0,
                 win_width: sc_desc.width as f32,
                 win_height: sc_desc.height as f32,
                 tex_width: width as f32,
@@ -457,6 +452,8 @@ impl GuiProgram {
         Some(encoder.finish())
     }
 
+    // Handles events related to the function of the GUI
+    // That is, mouse movement, scrolling, clicking as well as button presses
     pub fn update(&mut self, event: winit::event::WindowEvent) {
         match event {
             winit::event::WindowEvent::KeyboardInput { input, .. } => {
@@ -471,8 +468,7 @@ impl GuiProgram {
                 ..
             } => {
                 let max = filetree::compute_max_scroll(self);
-
-                self.state_manager.scroll(y, self.align.scale, max);
+                self.state_manager.scroll(y, max);
             },
             winit::event::WindowEvent::MouseInput {device_id: _, state, button, modifiers: _} => {
                 if state == winit::event::ElementState::Pressed  {
@@ -507,16 +503,6 @@ impl GuiProgram {
         frame: &wgpu::SwapChainOutput,
         device: &wgpu::Device,
     ) -> Vec<wgpu::CommandBuffer> {
-        if self.rebuild_pipeline {
-            self.pipeline = GuiProgram::create_pipeline(
-                device,
-                &self.sc_desc,
-                &self.vs_module,
-                &self.fs_module,
-                &self.pipeline_layout,
-            );
-            self.rebuild_pipeline = false;
-        }
 
         //// Check if we should swap state
         if let Ok(s) = self.state_manager.status_channel_rx.try_recv() {
@@ -524,6 +510,7 @@ impl GuiProgram {
             self.state_manager.status_message = Some(s);
         }
 
+        // Call the current state's render
         match &self.state_manager.state {
             UIState::FileTree => crate::ui::filetree::render(self, frame, device),
             UIState::Main => crate::ui::mainmenu::render(self, frame, device),

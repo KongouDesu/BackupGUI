@@ -1,16 +1,11 @@
-/// This module serves 2 purposes
-/// 1. Aligning vertices relative to something else
-/// 2. Handling scaling
+// Handles the alignment of vertices, rectangles, images etc.
 
 use crate::gui::Vertex;
 use crate::gui::TexVertex;
 
 pub struct AlignConfig {
-    // width and height is multiplied by scale
-    // This allows us to scale the UI size dynamically
-    pub scale: f32,
     // Size of the window/render area
-    // We need to know this to align things correctly (centering)
+    // We need to know this to align things correctly
     // Must be updated when the window is resized
     pub win_width: f32,
     pub win_height: f32,
@@ -31,16 +26,14 @@ pub enum Anchor {
 }
 
 impl AlignConfig {
+    // Call when the window is resized
     pub fn resize(&mut self, w: f32, h: f32) {
         self.win_width = w;
         self.win_height = h;
     }
 
     // Used by ui/mod.rs (file-tree rendering)
-    // Unlike image and click code, the (x,y) coordinates are _not_ scaled, as it does that locally
     pub fn rectangle(&self, anchor: Anchor, x: f32, y: f32, w: f32, h: f32, color: [f32;4]) -> Vec<Vertex> {
-        let w = w*self.scale;
-        let h = h*self.scale;
         match anchor {
             Anchor::TopLeft => {
                 Vertex::rect(x,y,w,h,color)
@@ -70,10 +63,6 @@ impl AlignConfig {
     // If the section is 'None', the whole image will be used
     #[allow(clippy::too_many_arguments)]
     pub fn image(&self, anchor: Anchor, x: f32, y: f32, w: f32, h: f32, angle: f32, section: Option<[f32;4]>) -> Vec<TexVertex> {
-        let x = x*self.scale;
-        let y = y*self.scale;
-        let w = w*self.scale;
-        let h = h*self.scale;
         let section = match section {
             Some(sec) => sec,
             None => [0.0,0.0,self.tex_width,self.tex_height],
@@ -102,14 +91,9 @@ impl AlignConfig {
         }
     }
 
-    // Returns 'true' if (cx,cy) was inside thw (x,y,w,h) rectangle, false otherwise
-    // Handles scaling of coordinates and area size
+    // Returns 'true' if (cx,cy) was inside the (x,y,w,h) rectangle, false otherwise
     #[allow(clippy::too_many_arguments)]
     pub fn was_area_clicked(&self, anchor: Anchor, cx: f32, cy: f32, x: f32, y: f32, w: f32, h: f32) -> bool {
-        let x = x*self.scale;
-        let y = y*self.scale;
-        let w = w*self.scale;
-        let h = h*self.scale;
         match anchor {
             Anchor::TopLeft => {
                 inside_rect(cx,cy,x,y,w,h)

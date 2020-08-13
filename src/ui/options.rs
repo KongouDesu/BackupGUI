@@ -164,7 +164,7 @@ pub fn render(
     ///// Images
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    let mut vertices = gui.align.image(Anchor::TopLeft, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,646.0,128.0,64.0]));
+    let mut vertices = gui.align.image(Anchor::TopLeft, 0.0, 0.0, 64.0, 32.0, 0.0, Some([0.0,651.0,128.0,64.0]));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, 175.0, 250.0, 169.0, 171.0, 0.0, Some([180.0,234.0,169.0,171.0])));
     let buffer = device.create_buffer_with_data(vertices.as_bytes(), BufferUsage::VERTEX);
 
