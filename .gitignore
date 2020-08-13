@@ -5,5 +5,4 @@ credentials
 config.cfg
 backuplist.dat
 *.pdn
-*.ttf
 *.jpg

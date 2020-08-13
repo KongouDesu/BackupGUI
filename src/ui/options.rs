@@ -142,17 +142,17 @@ pub fn render(
     th.draw_centered("Start Purge", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 150.0,
                      48.0, f32::INFINITY, [0.05,0.05,0.05,1.0]);
     th.draw_centered("Cleans up the cloud, removing old files", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 180.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
     th.draw_centered("Compares files on disk with files on cloud", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 210.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
     th.draw_centered("Files in cloud that cant be found on disk are removed", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 240.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
     th.draw_centered("This doesn't delete files but hides them", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 270.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
     th.draw_centered("Configure the lifecycle settings to adjust behavior", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 300.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
     th.draw_centered("Purging can take a few minutes", gui.align.win_width/2.0 - 225.0, gui.align.win_height/2.0 + 330.0,
-                     24.0, 450.0, [0.05,0.05,0.05,1.0]);
+                     24.0, 460.0, [0.05,0.05,0.05,1.0]);
 
     // Flush text
     th.flush(&device,&mut encoder, frame, (gui.sc_desc.width,gui.sc_desc.height));
