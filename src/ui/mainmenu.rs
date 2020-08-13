@@ -14,7 +14,7 @@ pub fn render(
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    let mut vertices = gui.align.image(Anchor::CenterGlobal, 196.0, 100.0, 196.0, 196.0, gui.timer, Some([0.0,0.0,256.0,256.0]));
+    let mut vertices = gui.align.image(Anchor::CenterGlobal, 196.0, 100.0, 196.0, 196.0, 0.0, Some([0.0,0.0,256.0,256.0]));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, 0.0, 100.0, 180.0, 180.0, 0.0,Some([0.0,406.0,180.0,180.0])));
     vertices.append(&mut gui.align.image(Anchor::CenterGlobal, -196.0, 100.0, 179.0, 148.0, 0.0,Some([0.0,257.0,179.0,148.0])));
 

@@ -232,7 +232,7 @@ impl Default for GUIConfig {
 impl StateManager {
     // Scroll an amount, uses +/- to scroll up/down
     pub fn scroll(&mut self, amount: f32, max: f32) {
-        self.scroll = (self.scroll+amount*self.config.font_size).min(0.0).max(-max);
+        self.scroll = (self.scroll+amount*self.config.font_size*(self.config.scroll_factor as f32)).min(0.0).max(-max);
     }
 
     // Call whenever the mouse is moved s.t. it can be accessed anywhere
