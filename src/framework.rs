@@ -7,6 +7,7 @@ use winit::{
 };
 
 use crate::gui::GuiProgram;
+use std::io::Cursor;
 
 #[allow(dead_code)]
 pub enum ShaderStage {
@@ -45,7 +46,19 @@ async fn setup(title: &str) -> Setup {
             .with_title(title)
             .with_inner_size(PhysicalSize::new(1024,768));
 
+        let img_data = include_bytes!("../icon.png");
+        let img = image::load(Cursor::new(&img_data[..]), image::ImageFormat::Png)
+            .unwrap()
+            .to_rgba();
+        let (width, height) = img.dimensions();
+        let img = img.into_vec();
+        let icon = match winit::window::Icon::from_rgba(img, width, height) {
+            Ok(i) => Some(i),
+            Err(_e) => None,
+        };
+
         let window = builder.build(&event_loop).unwrap();
+        window.set_window_icon(icon);
         let size = window.inner_size();
         let surface = wgpu::Surface::create(&window);
         (window, size, surface)
