@@ -117,19 +117,10 @@ pub fn render(
 
 // Start uploading files
 pub fn start(gui: &mut GuiProgram) {
-    // Only start once, even if we went to another screen
-    if gui.state_manager.upload_state.running {
-        println!("Upload already in progress");
-        return;
-    } else {
-        println!("Upload start");
-        gui.state_manager.upload_state.running = true;
-    }
-
     // Create a new queue
     // The 'get_files_for_upload' is not stopped even if the main upload thread ends
     // That means if we get an auth error, it would still be counting
-    // Since counting can sometimes take minutes (i.e. cold drives) we could end up having
+    // Since counting can sometimes take minutes (e.g. cold drives) we could end up having
     // more than one 'get_files_for_upload' threads running, resulting in duplicate files in the queue
     // So, to fix it we make a new queue here
     // TODO Stop 'get_files_for_upload' if the other upload thread exits

@@ -57,10 +57,6 @@ pub struct StateManager {
 }
 
 pub struct UploadState {
-    // Whether or not we're currently uploading
-    pub running: bool,
-    // Whether or not purge is running
-    pub purging: bool,
     // Each of the concurrent upload thread state trackers
     pub instances: Arc<Mutex<Vec<UploadInstance>>>,
     // Queue of files to be uploaded, shared between threads
@@ -83,8 +79,6 @@ impl Default for UploadState {
             instances.push(instance);
         }
         UploadState {
-            running: false,
-            purging: false,
             instances: Arc::new(Mutex::new(instances)),
             queue: Arc::new(Mutex::new(vec![])),
         }

@@ -259,6 +259,7 @@ pub fn handle_keypress(gui: &mut GuiProgram, key: &VirtualKeyCode, mods: &Modifi
             }
         },
         _ => {
+            // TODO Prettier way to handle this?
             let mut ch = match key {
                 VirtualKeyCode::A => 'a',
                 VirtualKeyCode::B => 'b',
