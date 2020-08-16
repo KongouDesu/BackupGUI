@@ -6,6 +6,8 @@ If you need to retrieve files, use the [web interface](https://secure.backblaze.
 ## Screenshots
 ![](ss.png)
 
+![](ss2.png)
+
 ## Requirements
 Requires a Vulkan driver on your system.   
 This should already be present on Windows, but you may need to install the package for your Linux distro.
