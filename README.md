@@ -3,6 +3,9 @@ A functioning backup tool with a GUI, written in Rust for the Backblaze's B2 Clo
 Note that this is a backup tool - it does not provide any synchronization or downloading of the files. 
 If you need to retrieve files, use the [web interface](https://secure.backblaze.com/user_signin.htm).
 
+## Screenshots
+![](ss.png)
+
 ## Requirements
 Requires a Vulkan driver on your system.   
 This should already be present on Windows, but you may need to install the package for your Linux distro.
