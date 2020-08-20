@@ -100,8 +100,13 @@ fn purge_task(q: Arc<Mutex<Vec<PathBuf>>>, bid: String, tx: Sender<String>, keys
     // Get local files
     // Make sure the filetree is exactly the stored list
     let root = crate::files::get_roots().unwrap();
-    if std::path::Path::new("backuplist.dat").exists() {
-        root.deserialize("backuplist.dat");
+    match root.deserialize("backuplist.dat") {
+        Ok(_) => {},
+        Err(e) => {
+            println!("Error reading backuplist.dat - Reason: {:?}", e);
+            tx.send("Got no files for upload, make sure you've selected some".to_string()).unwrap();
+            return
+        },
     }
     root.get_files_for_upload(&q);
 

@@ -383,9 +383,9 @@ impl DirEntry {
 
     /// Load the list of files to backup from a file
     /// Counterpart to serialize
-    pub fn deserialize<T: AsRef<Path>>(&self, file: T) {
+    pub fn deserialize<T: AsRef<Path>>(&self, file: T) -> Result<(),std::io::Error> {
         let path = file.as_ref();
-        let file = std::fs::File::open(path).unwrap();
+        let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);
         for line in reader.lines() {
             if line.is_err() {
@@ -415,6 +415,7 @@ impl DirEntry {
                 println!("Malformed entry - {}", line);
             }
         }
+        Ok(())
     }
 }
 

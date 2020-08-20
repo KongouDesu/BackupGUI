@@ -129,7 +129,14 @@ pub fn start(gui: &mut GuiProgram) {
     // Start the thread that queues files for upload
     // First, make sure the file-tree is read
     let root = crate::files::get_roots().unwrap();
-    root.deserialize("backuplist.dat");
+    match root.deserialize("backuplist.dat") {
+        Ok(_) => {},
+        Err(e) => {
+            println!("Error reading backuplist.dat - Reason: {:?}", e);
+            gui.state_manager.status_channel_tx.send("Got no files for upload, make sure you've selected some".to_string()).unwrap();
+            return
+        },
+    }
     let q = gui.state_manager.upload_state.queue.clone();
     std::thread::spawn(move || root.get_files_for_upload(&q));
 

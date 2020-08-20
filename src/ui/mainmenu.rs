@@ -87,7 +87,7 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, -196.0, 100.0, 179.0, 148.0) {
         println!("Swapping state to FileTree");
         if std::path::Path::new("backuplist.dat").exists() {
-            gui.state_manager.fileroot.deserialize("backuplist.dat");
+            gui.state_manager.fileroot.deserialize("backuplist.dat").unwrap();
         }
         gui.state_manager.status_message = None;
         Some(UIState::FileTree)
