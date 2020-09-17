@@ -216,12 +216,21 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                     };
                     let path_str = path.to_string_lossy().replace("\\", "/");
 
+                    // Under Unix, all paths are naturally prefix with '/' (the root)
+                    // B2 will not emulate folders if we start the path with a slash,
+                    // so we strip it here to make it behave correctly
+                    let name_in_b2 = if cfg!(windows) {
+                        &path_str
+                    } else {
+                        &path_str[1..]
+                    };
+
                     // Construct a StoredFile with the target name so we can binary search for it
                     // If found, check if it has been modified since it was uploaded
                     // If it has: upload it, if it hasn't: skip it
                     // Note that only file_name matters for comparing
                     let sf = raze::api::B2FileInfo {
-                        file_name: path_str.clone(),
+                        file_name: name_in_b2.to_string(),
                         file_id: None,
                         account_id: auth.account_id.clone(),
                         bucket_id: bucket_id.to_string(),
@@ -284,16 +293,6 @@ fn start_upload_threads(queue: Arc<Mutex<Vec<PathBuf>>>, instances: Arc<Mutex<Ve
                             inst.progress = 0;
                             inst.sender.clone()
                         };
-
-
-                        // Under Unix, all paths are naturally prefix with '/' (the root)
-                        // B2 will not emulate folders if we start the path with a slash, 
-                        // so we strip it here to make it behave correctly
-                        let name_in_b2 = if cfg!(windows) {
-                                &path_str
-                            } else {
-                                &path_str[1..]
-                            };
 
                         let params = raze::api::FileParameters {
                             file_path: name_in_b2,

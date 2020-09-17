@@ -236,8 +236,10 @@ pub fn handle_click(gui: &mut GuiProgram) -> Option<UIState> {
     gui.state_manager.strings.destring(&mut gui.state_manager.config);
 
     if gui.align.was_area_clicked(Anchor::TopRight, gui.state_manager.cx, gui.state_manager.cy, 0.0, 0.0, 64.0, 32.0) {
+        gui.save_config();
         return Some(UIState::Main)
     } else if gui.align.was_area_clicked(Anchor::CenterGlobal, gui.state_manager.cx, gui.state_manager.cy, 173.0, 248.0, 173.0, 175.0,) {
+        gui.save_config();
         crate::ui::purge::start_purge_thread(gui);
         return Some(UIState::Purge)
     }

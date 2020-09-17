@@ -523,7 +523,7 @@ impl GuiProgram {
     }
 
     // Saves the config when exiting
-    pub fn exit(&mut self) {
+    pub fn save_config(&mut self) {
         self.state_manager.strings.destring(&mut self.state_manager.config);
         let json = SerJson::serialize_json(&self.state_manager.config);
         std::fs::write("config.cfg",json).unwrap();

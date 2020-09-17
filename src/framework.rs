@@ -169,7 +169,7 @@ fn start(
                     ..
                 }
                 | WindowEvent::CloseRequested => {
-                    program.exit();
+                    program.save_config();
                     *control_flow = ControlFlow::Exit;
                 }
                 _ => {
