@@ -65,9 +65,11 @@ pub fn render(
                                                  width, BAR_HEIGHT - 2.0, [0.1,0.3,0.1,1.0]));
 
         // Text (showing file name)
-        gui.state_manager.text_handler.lock().unwrap().draw_centered(&instance_vec[i].name, (gui.sc_desc.width as f32)/2.0,
-                                                                     bar_start_y+(BAR_SPACING+BAR_HEIGHT)*i as f32 + BAR_HEIGHT/2.0,
-                                                                     20.0, BAR_WIDTH-2.0, [0.5,0.9,0.8,1.0]);
+        if !gui.state_manager.config.hide_file_names {
+            gui.state_manager.text_handler.lock().unwrap().draw_centered(&instance_vec[i].name, (gui.sc_desc.width as f32) / 2.0,
+                                                                         bar_start_y + (BAR_SPACING + BAR_HEIGHT) * i as f32 + BAR_HEIGHT / 2.0,
+                                                                         20.0, BAR_WIDTH - 2.0, [0.5, 0.9, 0.8, 1.0]);
+        }
     }
 
     // Write number of files remaining
